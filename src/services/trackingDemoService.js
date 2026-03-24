@@ -1,0 +1,199 @@
+/**
+ * Demo Data Service for Real-Time Tracking
+ * Simulates real-time location updates, SOS alerts, and user movement
+ * For production, replace with actual WebSocket/Firebase real-time updates
+ */
+
+// Sample user locations (simulated)
+const generateDemoLocations = () => {
+    const baseLocations = [
+        { city: 'Delhi', lat: 28.6139, lng: 77.2090 },
+        { city: 'Mumbai', lat: 19.0760, lng: 72.8777 },
+        { city: 'Bangalore', lat: 12.9716, lng: 77.5946 },
+        { city: 'Chennai', lat: 13.0827, lng: 80.2707 },
+        { city: 'Kolkata', lat: 22.5726, lng: 88.3639 },
+        { city: 'Hyderabad', lat: 17.3850, lng: 78.4867 },
+        { city: 'Pune', lat: 18.5204, lng: 73.8567 },
+        { city: 'Ahmedabad', lat: 23.0225, lng: 72.5714 },
+    ];
+
+    return baseLocations.map((loc, index) => ({
+        user_id: index + 1,
+        name: `User ${index + 1}`,
+        email: `user${index + 1}@example.com`,
+        phone: `+91${Math.floor(Math.random() * 9000000000 + 1000000000)}`,
+        profile_photo: null,
+        latitude: loc.lat + (Math.random() - 0.5) * 0.1,
+        longitude: loc.lng + (Math.random() - 0.5) * 0.1,
+        status: Math.random() > 0.8 ? 'danger' : Math.random() > 0.95 ? 'sos' : 'safe',
+        last_updated: new Date(Date.now() - Math.random() * 30 * 60 * 1000).toISOString(),
+        address: `${loc.city}, India`,
+        family: {
+            id: Math.floor(Math.random() * 5) + 1,
+            name: `Family ${Math.floor(Math.random() * 5) + 1}`,
+            members: 3,
+        },
+        emergency_contacts: [
+            {
+                name: `Emergency Contact ${index + 1}`,
+                relationship: 'Spouse',
+                phone: `+91${Math.floor(Math.random() * 9000000000 + 1000000000)}`,
+            },
+        ],
+        safety_score: Math.floor(Math.random() * 40) + 60,
+    }));
+};
+
+// Generate location history (path)
+const generateLocationHistory = (userId, minutes = 30, startPoint = null) => {
+    const history = [];
+    const now = Date.now();
+    const interval = 5 * 60 * 1000; // 5 minutes
+
+    let baseLat = startPoint?.latitude || 28.6139 + (Math.random() - 0.5) * 0.01;
+    let baseLng = startPoint?.longitude || 77.2090 + (Math.random() - 0.5) * 0.01;
+
+    for (let i = minutes; i >= 0; i -= 5) {
+        // Simulate slight movement
+        baseLat += (Math.random() - 0.5) * 0.001;
+        baseLng += (Math.random() - 0.5) * 0.001;
+
+        history.push({
+            user_id: userId,
+            latitude: baseLat,
+            longitude: baseLng,
+            timestamp: new Date(now - i * 60 * 1000).toISOString(),
+            speed: Math.random() * 20 + 20, // km/h
+            accuracy: Math.random() * 10 + 5, // meters
+        });
+    }
+
+    return history;
+};
+
+// Generate SOS alerts
+const generateDemoSOSAlerts = () => {
+    const alerts = [];
+    const numAlerts = Math.floor(Math.random() * 3);
+
+    for (let i = 0; i < numAlerts; i++) {
+        const baseLocations = [
+            { lat: 28.6139, lng: 77.2090, address: 'Connaught Place, New Delhi' },
+            { lat: 19.0760, lng: 72.8777, address: 'Marine Drive, Mumbai' },
+            { lat: 12.9716, lng: 77.5946, address: 'MG Road, Bangalore' },
+        ];
+
+        const loc = baseLocations[Math.floor(Math.random() * baseLocations.length)];
+
+        alerts.push({
+            id: Date.now() + i,
+            user_id: Math.floor(Math.random() * 10) + 1,
+            userName: `User ${Math.floor(Math.random() * 10) + 1}`,
+            type: ['emergency', 'distress', 'medical'][Math.floor(Math.random() * 3)],
+            message: [
+                'Need immediate help!',
+                'Feeling unsafe, please assist',
+                'Medical emergency',
+                'Being followed',
+            ][Math.floor(Math.random() * 4)],
+            latitude: loc.lat + (Math.random() - 0.5) * 0.01,
+            longitude: loc.lng + (Math.random() - 0.5) * 0.01,
+            location: loc.address,
+            status: 'active',
+            created_at: new Date(Date.now() - Math.random() * 60 * 60 * 1000).toISOString(),
+            sos_triggered_at: new Date(Date.now() - Math.random() * 60 * 60 * 1000).toISOString(),
+            email: `user${Math.floor(Math.random() * 10) + 1}@example.com`,
+            phone: `+91${Math.floor(Math.random() * 9000000000 + 1000000000)}`,
+            emergency_contacts: [
+                {
+                    name: 'Emergency Contact',
+                    relationship: 'Spouse',
+                    phone: `+91${Math.floor(Math.random() * 9000000000 + 1000000000)}`,
+                },
+            ],
+        });
+    }
+
+    return alerts;
+};
+
+// Generate nearby emergency services
+const generateEmergencyServices = (lat, lng, radius = 5000) => {
+    const services = [];
+    const numServices = Math.floor(Math.random() * 10) + 5;
+
+    const serviceTypes = ['police', 'hospital', 'safe_zone'];
+
+    for (let i = 0; i < numServices; i++) {
+        const type = serviceTypes[Math.floor(Math.random() * serviceTypes.length)];
+        const angle = Math.random() * 2 * Math.PI;
+        const distance = Math.random() * radius;
+        const serviceLat = lat + (distance * Math.cos(angle)) / 111000;
+        const serviceLng = lng + (distance * Math.sin(angle)) / (111000 * Math.cos(lat * Math.PI / 180));
+
+        services.push({
+            id: i + 1,
+            name: `${type === 'police' ? 'Police Station' : type === 'hospital' ? 'Hospital' : 'Safe Zone'} ${i + 1}`,
+            type: type,
+            latitude: serviceLat,
+            longitude: serviceLng,
+            address: `Location ${i + 1}, City`,
+            phone: type === 'police' ? '100' : type === 'hospital' ? '108' : '+919876543210',
+            distance: distance / 1000, // km
+        });
+    }
+
+    return services;
+};
+
+// Simulate real-time location update
+const simulateLocationUpdate = (previousLocation) => {
+    if (!previousLocation) return null;
+
+    // Simulate slight movement (walking/driving)
+    const latOffset = (Math.random() - 0.5) * 0.0005;
+    const lngOffset = (Math.random() - 0.5) * 0.0005;
+
+    return {
+        ...previousLocation,
+        latitude: previousLocation.latitude + latOffset,
+        longitude: previousLocation.longitude + lngOffset,
+        last_updated: new Date().toISOString(),
+    };
+};
+
+// Generate heatmap data (incident density)
+const generateHeatmapData = () => {
+    const hotspots = [
+        { lat: 28.6139, lng: 77.2090, intensity: 0.9, count: 45 }, // Delhi
+        { lat: 28.6289, lng: 77.2190, intensity: 0.7, count: 23 },
+        { lat: 19.0760, lng: 72.8777, intensity: 0.8, count: 38 }, // Mumbai
+        { lat: 19.0890, lng: 72.8677, intensity: 0.6, count: 18 },
+        { lat: 12.9716, lng: 77.5946, intensity: 0.75, count: 30 }, // Bangalore
+        { lat: 13.0827, lng: 80.2707, intensity: 0.65, count: 22 }, // Chennai
+        { lat: 22.5726, lng: 88.3639, intensity: 0.7, count: 25 }, // Kolkata
+        { lat: 17.3850, lng: 78.4867, intensity: 0.6, count: 20 }, // Hyderabad
+    ];
+
+    return hotspots.map((spot, index) => ({
+        id: index + 1,
+        latitude: spot.lat + (Math.random() - 0.5) * 0.05,
+        longitude: spot.lng + (Math.random() - 0.5) * 0.05,
+        intensity: spot.intensity,
+        count: spot.count,
+        incidents: Math.floor(Math.random() * 50) + 10,
+        lastIncident: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
+    }));
+};
+
+// Export demo data generators
+export const demoTrackingData = {
+    getLocations: generateDemoLocations,
+    getLocationHistory: generateLocationHistory,
+    getSOSAlerts: generateDemoSOSAlerts,
+    getEmergencyServices: generateEmergencyServices,
+    simulateLocationUpdate: simulateLocationUpdate,
+    getHeatmapData: generateHeatmapData,
+};
+
+export default demoTrackingData;
