@@ -29,8 +29,25 @@ export const fetchGrievances = createAsyncThunk(
             };
             const response = await adminApi.getGrievances(queryParams);
             if (response.data.success) {
+                const grievances = (response.data.data || []).map(g => ({
+                    id: g.id,
+                    user_id: g.user_id,
+                    user_first_name: g.user_first_name || '',
+                    user_last_name: g.user_last_name || '',
+                    user_email: g.user_email || '',
+                    user_phone: g.user_phone || '',
+                    title: g.title || '',
+                    description: g.description || '',
+                    category: g.category || '',
+                    priority: g.priority || 'medium',
+                    status: g.status || 'pending',
+                    resolution_notes: g.resolution_notes || '',
+                    assigned_to: g.assigned_to,
+                    created_at: g.created_at,
+                    updated_at: g.updated_at,
+                }));
                 return {
-                    grievances: response.data.data || [],
+                    grievances,
                     totalCount: response.data.pagination?.total || 0,
                 };
             }
@@ -47,7 +64,16 @@ export const fetchGrievanceStats = createAsyncThunk(
         try {
             const response = await adminApi.getGrievanceStats();
             if (response.data.success) {
-                return response.data.data;
+                const stats = response.data.data || {};
+                return {
+                    total: stats.total || 0,
+                    pending: stats.pending || 0,
+                    inProgress: stats.inProgress || 0,
+                    resolved: stats.resolved || 0,
+                    rejected: stats.rejected || 0,
+                    urgent: stats.urgent || 0,
+                    byCategory: stats.byCategory || [],
+                };
             }
             return rejectWithValue('Failed to fetch stats');
         } catch (error) {

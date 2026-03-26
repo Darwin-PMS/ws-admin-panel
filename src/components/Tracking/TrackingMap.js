@@ -1,625 +1,426 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, Circle } from 'react-leaflet';
-import { Icon, DivIcon } from 'leaflet';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
+import L from 'leaflet';
 import {
     Box,
-    Card,
-    CardContent,
     Typography,
-    Chip,
-    IconButton,
-    Button,
-    FormControl,
-    InputLabel,
-    Select,
-    MenuItem,
-    Checkbox,
-    ListItemText,
-    Divider,
+    InputBase,
     Avatar,
-    Badge,
-    Skeleton,
-    Alert,
-    Tooltip,
+    Tab,
+    Tabs,
+    Paper,
+    useTheme,
+    ButtonBase,
 } from '@mui/material';
 import {
-    LocationOn as LocationIcon,
-    Warning as WarningIcon,
-    CheckCircle as CheckCircleIcon,
-    Refresh as RefreshIcon,
-    FilterList as FilterIcon,
-    Layers as LayersIcon,
-    MyLocation as MyLocationIcon,
-    PlusOne as PlusOneIcon,
-    FamilyRestroom as FamilyIcon,
-    People as PeopleIcon,
-    EmergencyShare as EmergencyIcon,
-    Wifi as WifiIcon,
-    WifiOff as WifiOffIcon,
+    Phone as PhoneIcon,
+    FlashOn as BoltIcon,
+    Search as SearchIcon,
 } from '@mui/icons-material';
 import { useDispatch, useSelector } from 'react-redux';
-import {
-    fetchAllLocations,
-    fetchFamilyLocations,
-    fetchUserLocation,
-    fetchUserHistory,
-    fetchSOSAlerts,
-    fetchNearbyEmergencyServices,
-    setSelectedUser,
-    setSelectedFamily,
-    setSelectedUsers,
-    toggleUserSelection,
-    setTrackingMode,
-    updateFilters,
-    clearSelection,
-    updateLocation,
-} from '../../store/slices/trackingSlice';
-import { adminApi } from '../../services/api';
+import { fetchAllLocations, updateLocation } from '../../store/slices/trackingSlice';
 import { useWebSocket } from '../../hooks/useWebSocket';
-import UserDetailPanel from './UserDetailPanel';
-import TrackingControlPanel from './TrackingControlPanel';
-import SOSAlertHandler from './SOSAlertHandler';
+import 'leaflet/dist/leaflet.css';
 
-// Custom marker icons
-const createMarkerIcon = (status, isSOS = false) => {
-    const colors = {
-        safe: '#10b981',
-        danger: '#f59e0b',
-        sos: '#ef4444',
-    };
-
-    const color = colors[status] || colors.safe;
-
-    return new DivIcon({
-        className: 'custom-marker',
+// Custom Map Marker Icon (Truck)
+const createTruckIcon = (isActive = false) => {
+    return L.divIcon({
+        className: 'custom-truck-marker',
         html: `
             <div style="
-                background-color: ${color};
-                width: ${isSOS ? '50px' : '40px'};
-                height: ${isSOS ? '50px' : '40px'};
-                border-radius: 50%;
-                border: 3px solid white;
-                box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+                background: white;
+                padding: 4px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                ${isSOS ? 'animation: blink 1s infinite;' : ''}
+                border: ${isActive ? '2px solid #6366f1' : 'none'};
+                width: 40px;
+                height: 30px;
+                position: relative;
             ">
-                ${status === 'sos' ? '🚨' : status === 'danger' ? '⚠️' : '✓'}
+                <div style="
+                    position: absolute;
+                    top: -10px; right: -10px;
+                    background: ${isActive ? '#111' : '#f50057'};
+                    color: white;
+                    font-size: 10px;
+                    font-weight: bold;
+                    padding: 2px 6px;
+                    border-radius: 4px;
+                ">${isActive ? '2938' : '2934'}</div>
+                <img src="https://cdn-icons-png.flaticon.com/512/2830/2830305.png" alt="truck" style="width: 100%; height: 100%; object-fit: contain; opacity: 0.8;" />
+                <div style="
+                    position: absolute;
+                    bottom: -6px; left: 50%; transform: translateX(-50%);
+                    width: 0; height: 0; 
+                    border-left: 6px solid transparent;
+                    border-right: 6px solid transparent;
+                    border-top: 6px solid white;
+                "></div>
             </div>
         `,
-        iconSize: [isSOS ? 50 : 40, isSOS ? 50 : 40],
-        iconAnchor: [isSOS ? 25 : 20, isSOS ? 25 : 20],
-        popupAnchor: [0, -isSOS ? 25 : 20],
+        iconSize: [40, 30],
+        iconAnchor: [20, 30],
+        popupAnchor: [0, -35],
     });
 };
 
-// Emergency service icons
-const emergencyServiceIcons = {
-    police: new DivIcon({
-        className: 'emergency-marker',
-        html: '<div style="font-size: 24px;">👮</div>',
-        iconSize: [30, 30],
-        iconAnchor: [15, 15],
-    }),
-    hospital: new DivIcon({
-        className: 'emergency-marker',
-        html: '<div style="font-size: 24px;">🏥</div>',
-        iconSize: [30, 30],
-        iconAnchor: [15, 15],
-    }),
-    safe_zone: new DivIcon({
-        className: 'emergency-marker',
-        html: '<div style="font-size: 24px;">🛡️</div>',
-        iconSize: [30, 30],
-        iconAnchor: [15, 15],
-    }),
-};
+const UserPopover = ({ location }) => (
+    <Box sx={{ p: 0.5, minWidth: 160, textAlign: 'center' }}>
+        <Avatar
+            src={location?.profile_photo || `https://i.pravatar.cc/150?u=${location?.user_id}`}
+            sx={{ width: 64, height: 64, mx: 'auto', mb: 1, border: '3px solid #f3f4f6' }}
+        />
+        <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#1f2937' }}>
+            {location?.name || 'Unknown Driver'}
+        </Typography>
+        <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1.5 }}>
+            <span style={{ color: '#f59e0b', marginRight: '4px' }}>★</span> 4.9
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+            <ButtonBase sx={{
+                flex: 1, bgcolor: '#10b981', color: 'white', py: 0.75, borderRadius: 1.5,
+                '&:hover': { bgcolor: '#059669' }
+            }}>
+                <PhoneIcon fontSize="small" />
+            </ButtonBase>
+            <ButtonBase sx={{
+                flex: 1, bgcolor: '#10b981', color: 'white', py: 0.75, borderRadius: 1.5,
+                '&:hover': { bgcolor: '#059669' }
+            }}>
+                <BoltIcon fontSize="small" />
+            </ButtonBase>
+        </Box>
+    </Box>
+);
 
-const TrackingMap = () => {
-    const dispatch = useDispatch();
-    const mapRef = useRef(null);
-    const [userDetail, setUserDetail] = useState({ open: false, user: null });
-    const [sosAlertOpen, setSosAlertOpen] = useState(false);
-    const [sosUser, setSosUser] = useState(null);
-    const [emergencyServices, setEmergencyServices] = useState([]);
-    const [users, setUsers] = useState([]);
-    const [families, setFamilies] = useState([]);
-    const [loadingData, setLoadingData] = useState(false);
-    const [viewMode, setViewMode] = useState('standard'); // standard, satellite, terrain
-    const [autoRefresh, setAutoRefresh] = useState(true);
-    const [refreshInterval] = useState(30000); // 30 seconds
-    const [wsConnected, setWsConnected] = useState(false);
-
-    const {
-        locations,
-        selectedUser,
-        selectedFamily,
-        selectedUsers,
-        sosAlerts,
-        loading,
-        error,
-        lastUpdated,
-        trackingMode,
-        filters,
-    } = useSelector((state) => state.tracking);
-
-    // WebSocket real-time updates
-    const handleLocationUpdate = useCallback((payload) => {
-        dispatch(updateLocation({
-            userId: payload.userId,
-            latitude: payload.latitude,
-            longitude: payload.longitude,
-        }));
-    }, [dispatch]);
-
-    const handleSOSAlert = useCallback((payload) => {
-        setSosUser(payload);
-        setSosAlertOpen(true);
-
-        if (mapRef.current) {
-            mapRef.current.setView([payload.latitude, payload.longitude], 15);
-        }
-
-        dispatch(fetchNearbyEmergencyServices({
-            lat: payload.latitude,
-            lng: payload.longitude,
-        })).then((action) => {
-            if (action.payload) {
-                setEmergencyServices(action.payload.services || []);
-            }
-        });
-    }, [dispatch]);
-
-    const { isConnected } = useWebSocket({
-        autoConnect: true,
-        channels: ['admin', 'tracking'],
-        onLocationUpdate: handleLocationUpdate,
-        onSOSAlert: handleSOSAlert,
-        onConnectionChange: setWsConnected,
-    });
-
-    // Filter locations based on current filters and mode
-    const filteredLocations = React.useMemo(() => {
-        let filtered = locations || [];
-
-        // Apply status filters
-        if (!filters.showSafe) {
-            filtered = filtered.filter(loc => loc.status !== 'safe');
-        }
-        if (!filters.showDanger) {
-            filtered = filtered.filter(loc => loc.status !== 'danger');
-        }
-        if (!filters.showSOS) {
-            filtered = filtered.filter(loc => loc.status !== 'sos');
-        }
-
-        // Apply tracking mode filters
-        if (trackingMode === 'individual' && selectedUser) {
-            filtered = filtered.filter(loc => loc.user_id === selectedUser.user_id);
-        } else if (trackingMode === 'family' && selectedFamily) {
-            const familyMemberIds = selectedFamily.members?.map(m => m.user_id) || [];
-            filtered = filtered.filter(loc => familyMemberIds.includes(loc.user_id));
-        } else if (trackingMode === 'selected' && selectedUsers.length > 0) {
-            filtered = filtered.filter(loc => selectedUsers.includes(loc.user_id));
-        }
-
-        return filtered;
-    }, [locations, filters, trackingMode, selectedUser, selectedFamily, selectedUsers]);
-
-    // Fetch initial data
-    useEffect(() => {
-        const fetchInitialData = async () => {
-            setLoadingData(true);
-            try {
-                await dispatch(fetchAllLocations()).unwrap();
-                await dispatch(fetchSOSAlerts()).unwrap();
-
-                // Fetch users and families for filters
-                const [usersRes, familiesRes] = await Promise.all([
-                    adminApi.getUsers(),
-                    adminApi.getFamilies(),
-                ]);
-
-                if (usersRes.data.success) {
-                    setUsers(usersRes.data.users || []);
-                }
-                if (familiesRes.data.success) {
-                    setFamilies(familiesRes.data.families || []);
-                }
-            } catch (err) {
-                console.error('Error fetching initial data:', err);
-            } finally {
-                setLoadingData(false);
-            }
-        };
-
-        fetchInitialData();
-    }, [dispatch]);
-
-    // Auto-refresh locations
-    useEffect(() => {
-        if (!autoRefresh) return;
-
-        const interval = setInterval(() => {
-            dispatch(fetchAllLocations());
-            dispatch(fetchSOSAlerts());
-        }, refreshInterval);
-
-        return () => clearInterval(interval);
-    }, [dispatch, autoRefresh, refreshInterval]);
-
-    // Handle SOS alerts
-    useEffect(() => {
-        if (sosAlerts && sosAlerts.length > 0) {
-            const activeSOS = sosAlerts.filter(alert => alert.status === 'active');
-            if (activeSOS.length > 0 && !sosAlertOpen) {
-                const latestSOS = activeSOS[0];
-                setSosUser(latestSOS);
-                setSosAlertOpen(true);
-
-                // Auto-zoom to SOS location
-                if (mapRef.current) {
-                    mapRef.current.setView([latestSOS.latitude, latestSOS.longitude], 15);
-                }
-
-                // Fetch nearby emergency services
-                dispatch(fetchNearbyEmergencyServices({
-                    lat: latestSOS.latitude,
-                    lng: latestSOS.longitude,
-                })).then((action) => {
-                    if (action.payload) {
-                        setEmergencyServices(action.payload.services || []);
-                    }
-                });
-            }
-        }
-    }, [sosAlerts, dispatch, sosAlertOpen]);
-
-    // Handle user detail panel
-    const handleUserClick = async (userLocation) => {
-        setUserDetail({ open: true, user: userLocation });
-
-        // Fetch user history (last 30 minutes)
-        try {
-            await dispatch(fetchUserHistory({
-                userId: userLocation.user_id,
-                minutes: 30,
-            })).unwrap();
-        } catch (err) {
-            console.error('Error fetching user history:', err);
-        }
-    };
-
-    const handleCloseUserDetail = () => {
-        setUserDetail({ open: false, user: null });
-    };
-
-    const handleRefresh = () => {
-        dispatch(fetchAllLocations());
-        dispatch(fetchSOSAlerts());
-    };
-
-    const handleTrackingModeChange = (mode, data = null) => {
-        dispatch(clearSelection());
-        dispatch(setTrackingMode(mode));
-
-        if (mode === 'family' && data) {
-            dispatch(fetchFamilyLocations(data.id));
-        } else if (mode === 'individual' && data) {
-            dispatch(fetchUserLocation(data.user_id));
-        } else if (mode === 'all') {
-            dispatch(fetchAllLocations());
-        }
-    };
-
-    const handleUserToggle = (userId) => {
-        dispatch(toggleUserSelection(userId));
-    };
-
-    const centerOnUser = (lat, lng) => {
-        if (mapRef.current) {
-            mapRef.current.setView([lat, lng], 16);
-        }
-    };
-
-    const tileLayers = {
-        standard: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-        satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        terrain: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
-    };
+const DriverCard = ({ location, isActive, onClick }) => {
+    const isDelayed = location?.status === 'sos' || location?.status === 'danger';
 
     return (
-        <Box sx={{ height: 'calc(100vh - 120px)', position: 'relative' }}>
-            {/* CSS for blinking animation */}
-            <style>
-                {`
-                    @keyframes blink {
-                        0%, 100% { opacity: 1; transform: scale(1); }
-                        50% { opacity: 0.5; transform: scale(1.1); }
-                    }
-                    .custom-marker {
-                        background: transparent !important;
-                        border: none !important;
-                    }
-                    .emergency-marker {
-                        background: transparent !important;
-                        border: none !important;
-                    }
-                    .leaflet-popup-content-wrapper {
-                        border-radius: 12px !important;
-                    }
-                `}
-            </style>
-
-            {/* Top Control Bar */}
-            <Card sx={{ position: 'absolute', top: 16, left: 16, right: 16, zIndex: 1000, maxWidth: 'calc(100% - 32px)' }}>
-                <CardContent sx={{ py: 2, px: 3 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                            <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                                Real-Time Tracking
-                            </Typography>
-                            <Chip
-                                size="small"
-                                icon={isConnected ? <WifiIcon sx={{ fontSize: 16 }} /> : <WifiOffIcon sx={{ fontSize: 16 }} />}
-                                label={isConnected ? 'Live' : 'Reconnecting...'}
-                                color={isConnected ? 'success' : 'warning'}
-                                sx={{ animation: isConnected ? 'none' : 'pulse 1.5s infinite' }}
-                            />
-                            <Chip
-                                icon={<RefreshIcon />}
-                                label={`Updated: ${lastUpdated ? new Date(lastUpdated).toLocaleTimeString() : 'Never'}`}
-                                size="small"
-                                color={autoRefresh ? 'success' : 'default'}
-                            />
-                        </Box>
-
-                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                            <Tooltip title="Toggle Auto-Refresh">
-                                <Button
-                                    size="small"
-                                    variant={autoRefresh ? 'contained' : 'outlined'}
-                                    onClick={() => setAutoRefresh(!autoRefresh)}
-                                    color={autoRefresh ? 'success' : 'inherit'}
-                                >
-                                    Auto: {autoRefresh ? 'ON' : 'OFF'}
-                                </Button>
-                            </Tooltip>
-
-                            <Tooltip title="Refresh Now">
-                                <IconButton onClick={handleRefresh} size="small" disabled={loading}>
-                                    <RefreshIcon />
-                                </IconButton>
-                            </Tooltip>
-
-                            <Divider orientation="vertical" flexItem />
-
-                            <FormControl size="small" sx={{ minWidth: 120 }}>
-                                <InputLabel>Map View</InputLabel>
-                                <Select
-                                    value={viewMode}
-                                    label="Map View"
-                                    onChange={(e) => setViewMode(e.target.value)}
-                                    startIcon={<LayersIcon />}
-                                >
-                                    <MenuItem value="standard">Standard</MenuItem>
-                                    <MenuItem value="satellite">Satellite</MenuItem>
-                                    <MenuItem value="terrain">Terrain</MenuItem>
-                                </Select>
-                            </FormControl>
-                        </Box>
+        <Paper
+            elevation={isActive ? 3 : 0}
+            onClick={onClick}
+            sx={{
+                minWidth: 260,
+                maxWidth: 260,
+                height: 180,
+                p: 2,
+                borderRadius: 3,
+                border: '1px solid',
+                borderColor: isActive ? 'transparent' : 'divider',
+                bgcolor: isActive ? 'white' : 'transparent',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                flexDirection: 'column',
+                flexShrink: 0,
+            }}
+        >
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+                    <Avatar
+                        src={location?.profile_photo || `https://i.pravatar.cc/150?u=${location?.user_id}`}
+                        sx={{ width: 36, height: 36 }}
+                    />
+                    <Box>
+                        <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#1f2937', lineHeight: 1 }}>
+                            {location?.name || 'Driver Name'}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 500 }}>
+                            {location?.user_id || 'ID-100'}
+                        </Typography>
                     </Box>
-                </CardContent>
-            </Card>
+                </Box>
+                <Typography
+                    variant="caption"
+                    fontWeight={700}
+                    sx={{
+                        color: isDelayed ? '#ef4444' : '#10b981',
+                        fontSize: '0.65rem',
+                        letterSpacing: 0.5
+                    }}
+                >
+                    {isDelayed ? 'DELAYED' : 'ON TIME'}
+                </Typography>
+            </Box>
 
-            {/* Tracking Control Panel */}
-            <TrackingControlPanel
-                users={users}
-                families={families}
-                trackingMode={trackingMode}
-                selectedUser={selectedUser}
-                selectedFamily={selectedFamily}
-                selectedUsers={selectedUsers}
-                filters={filters}
-                onModeChange={handleTrackingModeChange}
-                onUserToggle={handleUserToggle}
-                onFiltersChange={(newFilters) => dispatch(updateFilters(newFilters))}
-            />
+            <Box sx={{ flex: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                    <Box sx={{ mt: 0.5, width: 8, height: 8, bgcolor: '#6366f1', borderRadius: '50%' }} />
+                    <Typography variant="body2" sx={{ color: '#4b5563', fontWeight: 500, fontSize: '0.8rem' }}>
+                        Current Location
+                        <Typography variant="caption" display="block" color="text.secondary">
+                            Lat: {location?.latitude?.toFixed(4)}, Lng: {location?.longitude?.toFixed(4)}
+                        </Typography>
+                    </Typography>
+                </Box>
+            </Box>
 
-            {/* Map */}
-            <Box sx={{ height: '100%', width: '100%' }}>
-                {error && (
-                    <Alert
-                        severity="error"
-                        sx={{
-                            position: 'absolute',
-                            top: 100,
-                            left: '50%',
-                            transform: 'translateX(-50%)',
-                            zIndex: 1001,
-                            minWidth: 400,
-                        }}
-                    >
-                        {error}
-                    </Alert>
-                )}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box sx={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid #d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Box sx={{ width: 6, height: 6, bgcolor: '#d1d5db', borderRadius: '50%' }} />
+                </Box>
+                <Typography variant="caption" sx={{ color: '#9ca3af', fontWeight: 600 }}>
+                    2H 20M ONLINE
+                </Typography>
+            </Box>
+        </Paper>
+    );
+};
 
+const LiveTrackingMap = () => {
+    const theme = useTheme();
+    const dispatch = useDispatch();
+    const mapRef = useRef(null);
+
+    const [searchQuery, setSearchQuery] = useState('');
+    const [mainTab, setMainTab] = useState(0); // 0: Drivers, 1: Tasks
+    const [filterTab, setFilterTab] = useState(0); // 0: All, 1: On time, 2: Delayed
+    const [selectedUserId, setSelectedUserId] = useState(null);
+
+    const { locations } = useSelector((state) => state.tracking);
+
+    useWebSocket({
+        autoConnect: true,
+        channels: ['admin', 'tracking'],
+        onLocationUpdate: useCallback((payload) => {
+            dispatch(updateLocation(payload));
+        }, [dispatch]),
+    });
+
+    useEffect(() => {
+        dispatch(fetchAllLocations());
+    }, [dispatch]);
+
+    // Derived states
+    const filteredLocations = useMemo(() => {
+        let result = locations || [];
+
+        if (searchQuery) {
+            const query = searchQuery.toLowerCase();
+            result = result.filter(loc =>
+                loc.name?.toLowerCase().includes(query) ||
+                loc.user_id?.toString().includes(query)
+            );
+        }
+
+        if (filterTab === 1) {
+            result = result.filter(loc => loc.status !== 'sos' && loc.status !== 'danger');
+        } else if (filterTab === 2) {
+            result = result.filter(loc => loc.status === 'sos' || loc.status === 'danger');
+        }
+
+        return result;
+    }, [locations, searchQuery, filterTab]);
+
+    const activeUser = useMemo(() =>
+        locations.find(l => l.user_id === selectedUserId),
+        [locations, selectedUserId]);
+
+    return (
+        <Box sx={{ position: 'relative', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', bgcolor: '#f4f4f5' }}>
+            <style>{`
+                .leaflet-popup-content-wrapper { border-radius: 16px !important; padding: 0 !important; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.1) !important; }
+                .leaflet-popup-content { margin: 12px 16px !important; }
+                .leaflet-popup-tip { background: white; }
+                .hide-scrollbar::-webkit-scrollbar { display: none; }
+                .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+            `}</style>
+
+            <Box sx={{ flexGrow: 1, position: 'relative', zIndex: 1 }}>
                 <MapContainer
-                    center={[20.5937, 78.9629]} // Center of India
-                    zoom={5}
+                    center={[34.0522, -118.2437]} // LA coordinates like in the image
+                    zoom={12}
                     style={{ height: '100%', width: '100%' }}
                     ref={mapRef}
                     zoomControl={false}
                 >
                     <TileLayer
-                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                        url={tileLayers[viewMode]}
+                        url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+                        attribution='&copy; <a href="https://carto.com/">CARTO</a>'
                     />
 
-                    {/* User Markers */}
-                    {filteredLocations.map((location) => (
-                        <Marker
-                            key={location.user_id}
-                            position={[location.latitude, location.longitude]}
-                            icon={createMarkerIcon(location.status, location.status === 'sos')}
-                            eventHandlers={{
-                                click: () => handleUserClick(location),
-                            }}
-                        >
-                            <Popup>
-                                <Box sx={{ minWidth: 200 }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                                        <Avatar
-                                            src={location.profile_photo}
-                                            sx={{ width: 40, height: 40 }}
-                                        >
-                                            {location.name?.charAt(0)}
-                                        </Avatar>
-                                        <Box>
-                                            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                                                {location.name}
-                                            </Typography>
-                                            <Chip
-                                                label={location.status?.toUpperCase()}
-                                                size="small"
-                                                color={
-                                                    location.status === 'sos' ? 'error' :
-                                                    location.status === 'danger' ? 'warning' : 'success'
-                                                }
-                                            />
-                                        </Box>
-                                    </Box>
-                                    <Typography variant="caption" color="text.secondary">
-                                        Last updated: {new Date(location.last_updated).toLocaleString()}
-                                    </Typography>
-                                    <Button
-                                        size="small"
-                                        fullWidth
-                                        variant="outlined"
-                                        sx={{ mt: 1 }}
-                                        onClick={() => handleUserClick(location)}
-                                    >
-                                        View Details
-                                    </Button>
-                                </Box>
-                            </Popup>
-                        </Marker>
-                    ))}
-
-                    {/* User History Trail */}
-                    {selectedUser?.history && selectedUser.history.length > 1 && (
+                    {/* Example active route polyline */}
+                    {activeUser && (
                         <Polyline
-                            positions={selectedUser.history.map(h => [h.latitude, h.longitude])}
-                            color="#6366f1"
+                            positions={[
+                                [activeUser.latitude, activeUser.longitude],
+                                [activeUser.latitude + 0.02, activeUser.longitude + 0.05]
+                            ]}
+                            color="#111827"
                             weight={3}
-                            opacity={0.7}
-                            dashArray="5, 10"
                         />
                     )}
 
-                    {/* Emergency Services */}
-                    {emergencyServices.map((service) => (
+                    {locations.map((loc) => (
                         <Marker
-                            key={service.id}
-                            position={[service.latitude, service.longitude]}
-                            icon={emergencyServiceIcons[service.type]}
+                            key={loc.user_id}
+                            position={[loc.latitude, loc.longitude]}
+                            icon={createTruckIcon(selectedUserId === loc.user_id)}
+                            eventHandlers={{
+                                click: () => {
+                                    setSelectedUserId(loc.user_id);
+                                    mapRef.current?.flyTo([loc.latitude, loc.longitude], 14, { duration: 0.8 });
+                                }
+                            }}
                         >
-                            <Popup>
-                                <Box>
-                                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                                        {service.name}
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary">
-                                        {service.type.replace('_', ' ').toUpperCase()}
-                                    </Typography>
-                                    <Typography variant="caption" display="block" color="text.secondary">
-                                        Distance: {service.distance?.toFixed(1)} km
-                                    </Typography>
-                                </Box>
+                            <Popup closeButton={false} autoPanPadding={[50, 50]}>
+                                <UserPopover location={loc} />
                             </Popup>
                         </Marker>
                     ))}
-
-                    {/* Safe/Unsafe Zones (Geofencing) */}
-                    {locations
-                        .filter(loc => loc.geofence)
-                        .map((loc) => (
-                            <Circle
-                                key={`geofence-${loc.user_id}`}
-                                center={[loc.latitude, loc.longitude]}
-                                radius={loc.geofence.radius || 500}
-                                pathOptions={{
-                                    color: loc.geofence.type === 'safe' ? '#10b981' : '#ef4444',
-                                    fillColor: loc.geofence.type === 'safe' ? '#10b981' : '#ef4444',
-                                    fillOpacity: 0.2,
-                                }}
-                            />
-                        ))}
                 </MapContainer>
             </Box>
 
-            {/* User Detail Panel */}
-            <UserDetailPanel
-                open={userDetail.open}
-                user={userDetail.user}
-                onClose={handleCloseUserDetail}
-                onCenterUser={centerOnUser}
-            />
-
-            {/* SOS Alert Handler */}
-            <SOSAlertHandler
-                open={sosAlertOpen}
-                sosUser={sosUser}
-                emergencyServices={emergencyServices}
-                onClose={() => setSosAlertOpen(false)}
-                onCenterUser={centerOnUser}
-            />
-
-            {/* Legend */}
-            <Card
+            {/* Floating Bottom Panel */}
+            <Box
                 sx={{
                     position: 'absolute',
-                    bottom: 16,
-                    right: 16,
+                    bottom: 24,
+                    left: 24,
+                    right: 24,
                     zIndex: 1000,
-                    minWidth: 150,
+                    bgcolor: 'white',
+                    borderRadius: 4,
+                    boxShadow: '0 20px 40px rgba(0,0,0,0.08)',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
                 }}
             >
-                <CardContent sx={{ py: 1.5, px: 2 }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-                        Legend
-                    </Typography>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#10b981' }} />
-                            <Typography variant="caption">Safe</Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#f59e0b' }} />
-                            <Typography variant="caption">Danger</Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#ef4444' }} />
-                            <Typography variant="caption">SOS Alert</Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Typography variant="caption">👮</Typography>
-                            <Typography variant="caption">Police</Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Typography variant="caption">🏥</Typography>
-                            <Typography variant="caption">Hospital</Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Typography variant="caption">🛡️</Typography>
-                            <Typography variant="caption">Safe Zone</Typography>
-                        </Box>
+                {/* Header Controls */}
+                <Box sx={{
+                    px: 3, py: 2,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 3,
+                    borderBottom: '1px solid',
+                    borderColor: 'grey.100'
+                }}>
+
+                    {/* Main Tabs */}
+                    <Box sx={{ display: 'flex', bgcolor: '#f3f4f6', borderRadius: 2, p: 0.5 }}>
+                        <ButtonBase
+                            onClick={() => setMainTab(0)}
+                            sx={{
+                                px: 3, py: 1, borderRadius: 1.5,
+                                bgcolor: mainTab === 0 ? '#6366f1' : 'transparent',
+                                color: mainTab === 0 ? 'white' : '#6b7280',
+                                fontWeight: 600, fontSize: '0.85rem',
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            Drivers <Box component="span" sx={{ ml: 1, bgcolor: mainTab === 0 ? 'rgba(255,255,255,0.2)' : '#e5e7eb', px: 1, py: 0.25, borderRadius: 1, fontSize: '0.7rem' }}>{locations.length}</Box>
+                        </ButtonBase>
+                        <ButtonBase
+                            onClick={() => setMainTab(1)}
+                            sx={{
+                                px: 3, py: 1, borderRadius: 1.5,
+                                bgcolor: mainTab === 1 ? '#6366f1' : 'transparent',
+                                color: mainTab === 1 ? 'white' : '#6b7280',
+                                fontWeight: 600, fontSize: '0.85rem',
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            Tasks <Box component="span" sx={{ ml: 1, bgcolor: mainTab === 1 ? 'rgba(255,255,255,0.2)' : '#e5e7eb', px: 1, py: 0.25, borderRadius: 1, fontSize: '0.7rem' }}>54</Box>
+                        </ButtonBase>
                     </Box>
-                </CardContent>
-            </Card>
+
+                    {/* Filter Tabs */}
+                    <Tabs
+                        value={filterTab}
+                        onChange={(_, v) => setFilterTab(v)}
+                        TabIndicatorProps={{ style: { display: 'none' } }}
+                        sx={{
+                            minHeight: 0,
+                            '& .MuiTab-root': {
+                                minHeight: 0, py: 1, px: 3,
+                                borderRadius: 8,
+                                textTransform: 'none',
+                                fontWeight: 600,
+                                color: '#9ca3af',
+                                margin: '0 4px',
+                                border: '1px solid transparent',
+                                '&.Mui-selected': {
+                                    color: '#6366f1',
+                                    borderColor: '#e0e7ff',
+                                    bgcolor: '#eef2ff'
+                                }
+                            }
+                        }}
+                    >
+                        <Tab label="All" />
+                        <Tab label="On time" />
+                        <Tab label="Delayed" />
+                    </Tabs>
+
+                    <Box sx={{ flexGrow: 1 }} />
+
+                    {/* Search */}
+                    <Box sx={{
+                        display: 'flex', alignItems: 'center',
+                        bgcolor: 'white', borderRadius: 8, px: 2, py: 1,
+                        border: '1px solid #e5e7eb', width: 280
+                    }}>
+                        <SearchIcon sx={{ color: '#9ca3af', fontSize: 20, mr: 1 }} />
+                        <InputBase
+                            placeholder="Search tasks or drivers"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            sx={{ flex: 1, fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}
+                        />
+                    </Box>
+                </Box>
+
+                {/* Cards Container */}
+                <Box
+                    className="hide-scrollbar"
+                    sx={{
+                        p: 3,
+                        display: 'flex',
+                        gap: 2,
+                        overflowX: 'auto',
+                        bgcolor: '#fafafa'
+                    }}
+                >
+                    {filteredLocations.map(loc => (
+                        <DriverCard
+                            key={loc.user_id}
+                            location={loc}
+                            isActive={selectedUserId === loc.user_id}
+                            onClick={() => {
+                                setSelectedUserId(loc.user_id);
+                                mapRef.current?.flyTo([loc.latitude, loc.longitude], 14, { duration: 0.8 });
+                            }}
+                        />
+                    ))}
+
+                    {filteredLocations.length === 0 && (
+                        <Typography sx={{ color: 'text.secondary', py: 4, px: 2 }}>
+                            {searchQuery ? 'No tracking data matches your search.' : 'No locations available.'}
+                        </Typography>
+                    )}
+                </Box>
+            </Box>
+
+            {/* Map UI Overlays (like zoom buttons in the image) */}
+            <Paper sx={{
+                position: 'absolute', top: 24, right: 24, zIndex: 1000,
+                display: 'flex', flexDirection: 'column', borderRadius: 2, overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+            }}>
+                <ButtonBase sx={{ p: 1.5, borderBottom: '1px solid #f3f4f6', bgcolor: 'white', '&:hover': { bgcolor: '#f9fafb' } }} onClick={() => mapRef.current?.zoomIn()}>
+                    <Typography variant="h6" sx={{ lineHeight: 0.5, color: '#374151' }}>+</Typography>
+                </ButtonBase>
+                <ButtonBase sx={{ p: 1.5, bgcolor: 'white', '&:hover': { bgcolor: '#f9fafb' } }} onClick={() => mapRef.current?.zoomOut()}>
+                    <Typography variant="h6" sx={{ lineHeight: 0.5, color: '#374151' }}>-</Typography>
+                </ButtonBase>
+            </Paper>
+
         </Box>
     );
 };
 
-export default TrackingMap;
+export default LiveTrackingMap;

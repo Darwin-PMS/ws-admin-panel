@@ -1,6 +1,9 @@
 import axios from 'axios';
 import { API_CONFIG, ENDPOINTS } from './endpoints';
 
+console.log('API_CONFIG:', API_CONFIG);
+console.log('LOGIN_ENDPOINT:', ENDPOINTS.auth.login);
+
 const api = axios.create({
   baseURL: API_CONFIG.BASE_URL,
   timeout: API_CONFIG.TIMEOUT,
@@ -11,6 +14,7 @@ const api = axios.create({
 
 api.interceptors.request.use(
   (config) => {
+    console.log('API REQUEST:', config.method?.toUpperCase(), config.url);
     const token = localStorage.getItem('adminToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -92,10 +96,11 @@ export const adminApi = {
     family: (familyId, params) => api.get(ENDPOINTS.tracking.family(familyId), { params }),
     user: (userId) => api.get(ENDPOINTS.tracking.user(userId)),
     userHistory: (userId, params) => api.get(ENDPOINTS.tracking.userHistory(userId), { params }),
+    getUserLocationHistory: (userId, params) => api.get(ENDPOINTS.tracking.userHistory(userId), { params }),
+    nearby: (params) => api.get(ENDPOINTS.tracking.nearby, { params }),
     updateLocation: (userId, data) => api.post(ENDPOINTS.tracking.updateLocation(userId), data),
     predict: (userId, params) => api.get(ENDPOINTS.tracking.predict(userId), { params }),
     status: (userId) => api.get(ENDPOINTS.tracking.status(userId)),
-    nearby: (params) => api.get(ENDPOINTS.tracking.nearby, { params }),
     geofences: (params) => api.get(ENDPOINTS.tracking.geofences, { params }),
     createGeofence: (data) => api.post(ENDPOINTS.tracking.geofences, data),
     geofence: (id) => api.get(ENDPOINTS.tracking.geofence(id)),
@@ -193,6 +198,18 @@ export const adminApi = {
     setDefault: (id) => api.put(ENDPOINTS.themes.setDefault(id)),
   },
 
+  childcare: {
+    getChildren: (params) => api.get(ENDPOINTS.childcare.children, { params }),
+    getChild: (id) => api.get(ENDPOINTS.childcare.child(id)),
+    createChild: (data) => api.post(ENDPOINTS.childcare.createChild, data),
+    updateChild: (id, data) => api.put(ENDPOINTS.childcare.updateChild(id), data),
+    deleteChild: (id) => api.delete(ENDPOINTS.childcare.child(id)),
+    getSchedules: (params) => api.get(ENDPOINTS.childcare.schedules, { params }),
+    deleteSchedule: (id) => api.delete(ENDPOINTS.childcare.deleteSchedule(id)),
+    getAlerts: (params) => api.get(ENDPOINTS.childcare.alerts, { params }),
+    getSchoolZones: (params) => api.get(ENDPOINTS.childcare.schoolZones, { params }),
+  },
+
   // Backward compatibility aliases - matches existing slice method names
   login: (credentials) => api.post(ENDPOINTS.auth.login, credentials),
   logout: () => api.post(ENDPOINTS.auth.logout),
@@ -272,6 +289,12 @@ export const adminApi = {
   createMenu: (data) => api.post(ENDPOINTS.menus.create, data),
   updateMenu: (id, data) => api.put(ENDPOINTS.menus.update(id), data),
   deleteMenu: (id) => api.delete(ENDPOINTS.menus.delete(id)),
+  
+  // Generic methods for flexible requests
+  get: (url) => api.get(url),
+  post: (url, data) => api.post(url, data),
+  put: (url, data) => api.put(url, data),
+  delete: (url) => api.delete(url),
 };
 
 export { ENDPOINTS, API_CONFIG };

@@ -24,7 +24,21 @@ export const fetchSettings = createAsyncThunk(
         try {
             const response = await adminApi.getSettings();
             if (response.data.success) {
-                return response.data.settings;
+                const settingsArray = response.data.settings || [];
+                const settingsMap = {};
+                settingsArray.forEach(s => {
+                    settingsMap[s.setting_key] = s.setting_value;
+                });
+                return {
+                    siteName: settingsMap.siteName || 'Women Safety App',
+                    siteDescription: settingsMap.siteDescription || 'A comprehensive women safety application',
+                    emailNotifications: settingsMap.emailNotifications === 'true' || settingsMap.emailNotifications === true,
+                    sosAlerts: settingsMap.sosAlerts !== 'false',
+                    weeklyReports: settingsMap.weeklyReports === 'true',
+                    language: settingsMap.language || 'en',
+                    theme: settingsMap.theme || 'dark',
+                    maintenanceMode: settingsMap.maintenanceMode === 'true',
+                };
             }
             return rejectWithValue('Failed to fetch settings');
         } catch (error) {
@@ -37,11 +51,12 @@ export const updateSettings = createAsyncThunk(
     'settings/updateSettings',
     async (settings, { rejectWithValue }) => {
         try {
-            const response = await adminApi.updateSettings(settings);
-            if (response.data.success) {
-                return response.data.settings;
+            const updates = [];
+            for (const [key, value] of Object.entries(settings)) {
+                updates.push(adminApi.updateSettings({ key, value: String(value) }));
             }
-            return rejectWithValue('Failed to update settings');
+            await Promise.all(updates);
+            return settings;
         } catch (error) {
             return rejectWithValue(error.message || 'Network error');
         }
@@ -84,7 +99,7 @@ const settingsSlice = createSlice({
             })
             .addCase(updateSettings.fulfilled, (state, action) => {
                 state.loading = false;
-                state.settings = action.payload;
+                state.settings = { ...state.settings, ...action.payload };
                 state.saved = true;
             })
             .addCase(updateSettings.rejected, (state, action) => {

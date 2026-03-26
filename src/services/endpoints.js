@@ -137,6 +137,16 @@ export const ENDPOINTS = {
     delete: (id) => `${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/admin/themes/${id}`,
     setDefault: (id) => `${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/admin/themes/${id}/default`,
   },
+  childcare: {
+    children: `${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/admin/childcare/children`,
+    child: (id) => `${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/admin/childcare/children/${id}`,
+    createChild: `${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/admin/childcare/children`,
+    updateChild: (id) => `${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/admin/childcare/children/${id}`,
+    schedules: `${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/admin/childcare/schedules`,
+    deleteSchedule: (id) => `${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/admin/childcare/schedules/${id}`,
+    alerts: `${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/admin/childcare/alerts`,
+    schoolZones: `${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/admin/childcare/school-zones`,
+  },
 };
 
 export default ENDPOINTS;

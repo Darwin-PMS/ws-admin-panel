@@ -22,8 +22,19 @@ export const fetchUsers = createAsyncThunk(
         try {
             const response = await adminApi.getUsers(params);
             if (response.data.success) {
+                const users = (response.data.users || []).map(u => ({
+                    id: u.id,
+                    firstName: u.first_name,
+                    lastName: u.last_name,
+                    email: u.email,
+                    phone: u.phone,
+                    role: u.role,
+                    isActive: u.is_active,
+                    isVerified: u.is_verified,
+                    createdAt: u.created_at,
+                }));
                 return {
-                    users: response.data.users || [],
+                    users,
                     total: response.data.total || response.data.users?.length || 0
                 };
             }
@@ -40,7 +51,18 @@ export const fetchUserById = createAsyncThunk(
         try {
             const response = await adminApi.getUserById(id);
             if (response.data.success) {
-                return response.data.user;
+                const u = response.data.user;
+                return {
+                    id: u.id,
+                    firstName: u.first_name,
+                    lastName: u.last_name,
+                    email: u.email,
+                    phone: u.phone,
+                    role: u.role,
+                    isActive: u.is_active,
+                    isVerified: u.is_verified,
+                    createdAt: u.created_at,
+                };
             }
             return rejectWithValue('Failed to fetch user');
         } catch (error) {

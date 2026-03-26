@@ -69,8 +69,8 @@ const ActivityLogs = () => {
 
     const filteredLogs = logs.filter(log => {
         const matchesSearch =
-            (log.user || '').toLowerCase().includes(filters.search.toLowerCase()) ||
-            (log.details || '').toLowerCase().includes(filters.search.toLowerCase());
+            (log.user_name || '').toLowerCase().includes(filters.search.toLowerCase()) ||
+            (log.description || '').toLowerCase().includes(filters.search.toLowerCase());
         const matchesAction = filters.action === 'all' || log.action === filters.action;
         return matchesSearch && matchesAction;
     });
@@ -184,22 +184,22 @@ const ActivityLogs = () => {
                                             </TableCell>
                                             <TableCell>
                                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                                    {log.user}
+                                                    {log.user_name || 'System'}
                                                 </Typography>
                                             </TableCell>
                                             <TableCell>
                                                 <Typography variant="body2" color="text.secondary">
-                                                    {log.details}
+                                                    {log.description || '-'}
                                                 </Typography>
                                             </TableCell>
                                             <TableCell>
                                                 <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
-                                                    {log.ip}
+                                                    {log.ip_address || '-'}
                                                 </Typography>
                                             </TableCell>
                                             <TableCell>
                                                 <Typography variant="body2" color="text.secondary">
-                                                    {log.timestamp}
+                                                    {log.timestamp ? new Date(log.timestamp).toLocaleString() : '-'}
                                                 </Typography>
                                             </TableCell>
                                         </TableRow>

@@ -21,10 +21,16 @@ export const fetchActivityLogs = createAsyncThunk(
         try {
             const response = await adminApi.getActivityLogs(params);
             if (response.data.success) {
-                // Transform timestamps to readable format
                 const logs = (response.data.logs || []).map((log) => ({
-                    ...log,
-                    timestamp: log.timestamp ? new Date(log.timestamp).toLocaleString() : new Date().toLocaleString(),
+                    id: log.id,
+                    user_id: log.user_id,
+                    user_name: log.user_name || 'System',
+                    action: log.action,
+                    description: log.description || log.action,
+                    ip_address: log.ip_address,
+                    device_info: log.device_info,
+                    created_at: log.created_at,
+                    timestamp: log.created_at ? new Date(log.created_at).toLocaleString() : new Date().toLocaleString(),
                 }));
                 return {
                     logs,

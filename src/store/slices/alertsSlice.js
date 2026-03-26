@@ -21,8 +21,23 @@ export const fetchAlerts = createAsyncThunk(
         try {
             const response = await adminApi.getSOSAlerts(params);
             if (response.data.success) {
+                const alerts = (response.data.alerts || []).map(a => ({
+                    id: a.id,
+                    userId: a.user_id,
+                    type: a.type || 'emergency',
+                    message: a.message || a.description || 'Emergency alert triggered',
+                    status: a.status || 'active',
+                    latitude: a.latitude,
+                    longitude: a.longitude,
+                    location: a.latitude && a.longitude ? `${a.latitude}, ${a.longitude}` : null,
+                    mapUrl: a.latitude && a.longitude ? `https://www.google.com/maps?q=${a.latitude},${a.longitude}` : null,
+                    userName: a.user_name || a.userName || 'Unknown User',
+                    userPhone: a.user_phone || a.userPhone || null,
+                    createdAt: a.created_at,
+                    resolvedAt: a.resolved_at,
+                }));
                 return {
-                    alerts: response.data.alerts || [],
+                    alerts,
                     total: response.data.total || response.data.alerts?.length || 0
                 };
             }
@@ -39,7 +54,22 @@ export const fetchAlertById = createAsyncThunk(
         try {
             const response = await adminApi.getSOSAlertById(id);
             if (response.data.success) {
-                return response.data.alert;
+                const a = response.data.alert;
+                return {
+                    id: a.id,
+                    userId: a.user_id,
+                    type: a.type || 'emergency',
+                    message: a.message || a.description || 'Emergency alert triggered',
+                    status: a.status || 'active',
+                    latitude: a.latitude,
+                    longitude: a.longitude,
+                    location: a.latitude && a.longitude ? `${a.latitude}, ${a.longitude}` : null,
+                    mapUrl: a.latitude && a.longitude ? `https://www.google.com/maps?q=${a.latitude},${a.longitude}` : null,
+                    userName: a.user_name || a.userName || 'Unknown User',
+                    userPhone: a.user_phone || a.userPhone || null,
+                    createdAt: a.created_at,
+                    resolvedAt: a.resolved_at,
+                };
             }
             return rejectWithValue('Failed to fetch alert');
         } catch (error) {

@@ -225,7 +225,7 @@ export const PermissionProvider = ({ children }) => {
             {
                 key: 'tracking',
                 label: 'Tracking',
-                icon: 'Security',
+                icon: 'Map',
                 path: '/tracking',
                 permission: PERMISSIONS.TRACKING_VIEW,
                 roles: Object.values(ROLES),

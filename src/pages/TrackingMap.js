@@ -1,20 +1,19 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Box } from '@mui/material';
-import TrackingMapComponent from '../components/Tracking/TrackingMap';
-import { useDispatch } from 'react-redux';
-import { fetchAllLocations, fetchSOSAlerts } from '../store/slices/trackingSlice';
+import LiveTrackingMap from '../components/Tracking/TrackingMap';
 
 const TrackingMap = () => {
-    const dispatch = useDispatch();
-
-    useEffect(() => {
-        dispatch(fetchAllLocations());
-        dispatch(fetchSOSAlerts());
-    }, [dispatch]);
-
     return (
-        <Box sx={{ height: 'calc(100vh - 120px)', position: 'relative' }}>
-            <TrackingMapComponent />
+        <Box
+            sx={{
+                height: 'calc(100vh - 64px)',
+                position: 'relative',
+                bgcolor: 'background.default',
+                overflow: 'hidden',
+                m: { xs: -2, sm: -3 } // Break out of AdminLayout padding
+            }}
+        >
+            <LiveTrackingMap />
         </Box>
     );
 };

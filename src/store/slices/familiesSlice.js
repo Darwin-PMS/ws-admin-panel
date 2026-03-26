@@ -4,6 +4,7 @@ import { adminApi } from '../../services/api';
 const initialState = {
     families: [],
     selectedFamily: null,
+    familyMembers: [],
     totalCount: 0,
     loading: false,
     error: null,
@@ -15,26 +16,26 @@ const initialState = {
     },
 };
 
-// Async thunks
 export const fetchFamilies = createAsyncThunk(
     'families/fetchFamilies',
     async (params = {}, { rejectWithValue }) => {
         try {
-            const response = await adminApi.getFamilies(params);
+            const response = await adminApi.families.list(params);
             if (response.data.success) {
-                // Transform users into families
-                const familyData = (response.data.families || []).map((user) => ({
-                    id: user.id,
-                    name: `${user.firstName} ${user.lastName}'s Family`,
-                    owner: `${user.firstName} ${user.lastName}`,
-                    members: user.familyMembers || user.membersCount || 2,
-                    children: user.childrenCount || 1,
-                    createdAt: user.createdAt ? new Date(user.createdAt).toLocaleDateString() : new Date().toLocaleDateString(),
-                    status: user.isActive ? 'active' : 'inactive',
+                const families = (response.data.families || []).map((f) => ({
+                    id: f.id,
+                    name: f.name || 'Unnamed Family',
+                    code: f.code,
+                    description: f.description,
+                    status: f.status || 'active',
+                    createdAt: f.createdAt ? new Date(f.createdAt).toLocaleDateString() : 'N/A',
+                    creatorName: f.creatorName || 'Unknown',
+                    memberCount: f.memberCount || 0,
+                    locationCount: f.locationCount || 0,
                 }));
                 return {
-                    families: familyData,
-                    total: response.data.total || response.data.families?.length || 0
+                    families,
+                    total: response.data.total || families.length
                 };
             }
             return rejectWithValue('Failed to fetch families');
@@ -48,11 +49,49 @@ export const fetchFamilyById = createAsyncThunk(
     'families/fetchFamilyById',
     async (id, { rejectWithValue }) => {
         try {
-            const response = await adminApi.getFamilyById(id);
+            const response = await adminApi.families.get(id);
             if (response.data.success) {
-                return response.data.family;
+                const family = response.data.family;
+                const members = response.data.members || [];
+                return {
+                    family: {
+                        id: family.id,
+                        name: family.name || 'Unnamed Family',
+                        code: family.code,
+                        description: family.description,
+                        status: family.status || 'active',
+                        createdAt: family.createdAt ? new Date(family.createdAt).toLocaleDateString() : 'N/A',
+                        creatorName: family.creatorName || 'Unknown',
+                        memberCount: family.memberCount || members.length,
+                        locationCount: family.locationCount || 0,
+                    },
+                    members: members.map(m => ({
+                        id: m.id,
+                        user_id: m.user_id,
+                        name: m.name || `${m.first_name || ''} ${m.last_name || ''}`.trim() || m.email || 'Unknown',
+                        email: m.email,
+                        phone: m.phone,
+                        role: m.role || m.user_role,
+                        joinedAt: m.joinedAt || m.joined_at,
+                    }))
+                };
             }
             return rejectWithValue('Failed to fetch family');
+        } catch (error) {
+            return rejectWithValue(error.message || 'Network error');
+        }
+    }
+);
+
+export const createFamily = createAsyncThunk(
+    'families/createFamily',
+    async (data, { rejectWithValue }) => {
+        try {
+            const response = await adminApi.families.create(data);
+            if (response.data.success) {
+                return response.data;
+            }
+            return rejectWithValue('Failed to create family');
         } catch (error) {
             return rejectWithValue(error.message || 'Network error');
         }
@@ -63,9 +102,9 @@ export const updateFamily = createAsyncThunk(
     'families/updateFamily',
     async ({ id, data }, { rejectWithValue }) => {
         try {
-            const response = await adminApi.updateFamily(id, data);
+            const response = await adminApi.families.update(id, data);
             if (response.data.success) {
-                return response.data.family;
+                return { id, data };
             }
             return rejectWithValue('Failed to update family');
         } catch (error) {
@@ -78,26 +117,11 @@ export const deleteFamily = createAsyncThunk(
     'families/deleteFamily',
     async (id, { rejectWithValue }) => {
         try {
-            const response = await adminApi.deleteFamily(id);
+            const response = await adminApi.families.delete(id);
             if (response.data.success) {
                 return id;
             }
             return rejectWithValue('Failed to delete family');
-        } catch (error) {
-            return rejectWithValue(error.message || 'Network error');
-        }
-    }
-);
-
-export const createFamily = createAsyncThunk(
-    'families/createFamily',
-    async (data, { rejectWithValue }) => {
-        try {
-            const response = await adminApi.createFamily(data);
-            if (response.data.success) {
-                return response.data.family;
-            }
-            return rejectWithValue('Failed to create family');
         } catch (error) {
             return rejectWithValue(error.message || 'Network error');
         }
@@ -128,11 +152,11 @@ const familiesSlice = createSlice({
         },
         clearSelectedFamily: (state) => {
             state.selectedFamily = null;
+            state.familyMembers = [];
         },
     },
     extraReducers: (builder) => {
         builder
-            // Fetch Families
             .addCase(fetchFamilies.pending, (state) => {
                 state.loading = true;
                 state.error = null;
@@ -146,47 +170,44 @@ const familiesSlice = createSlice({
                 state.loading = false;
                 state.error = action.payload;
             })
-            // Fetch Family By ID
             .addCase(fetchFamilyById.pending, (state) => {
                 state.loading = true;
                 state.error = null;
             })
             .addCase(fetchFamilyById.fulfilled, (state, action) => {
                 state.loading = false;
-                state.selectedFamily = action.payload;
+                state.selectedFamily = action.payload.family;
+                state.familyMembers = action.payload.members;
             })
             .addCase(fetchFamilyById.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload;
             })
-            // Update Family
-            .addCase(updateFamily.fulfilled, (state, action) => {
-                const index = state.families.findIndex(f => f.id === action.payload.id);
-                if (index !== -1) {
-                    state.families[index] = action.payload;
-                }
-                if (state.selectedFamily?.id === action.payload.id) {
-                    state.selectedFamily = action.payload;
-                }
-            })
-            // Delete Family
-            .addCase(deleteFamily.fulfilled, (state, action) => {
-                state.families = state.families.filter(f => f.id !== action.payload);
-                state.totalCount = Math.max(0, state.totalCount - 1);
-            })
-            // Create Family
             .addCase(createFamily.pending, (state) => {
                 state.loading = true;
                 state.error = null;
             })
-            .addCase(createFamily.fulfilled, (state, action) => {
+            .addCase(createFamily.fulfilled, (state) => {
                 state.loading = false;
-                state.families.unshift(action.payload);
-                state.totalCount += 1;
             })
             .addCase(createFamily.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload;
+            })
+            .addCase(updateFamily.fulfilled, (state, action) => {
+                state.loading = false;
+                const index = state.families.findIndex(f => f.id === action.payload.id);
+                if (index !== -1) {
+                    state.families[index] = { ...state.families[index], ...action.payload.data };
+                }
+                if (state.selectedFamily?.id === action.payload.id) {
+                    state.selectedFamily = { ...state.selectedFamily, ...action.payload.data };
+                }
+            })
+            .addCase(deleteFamily.fulfilled, (state, action) => {
+                state.loading = false;
+                state.families = state.families.filter(f => f.id !== action.payload);
+                state.totalCount = Math.max(0, state.totalCount - 1);
             });
     },
 });

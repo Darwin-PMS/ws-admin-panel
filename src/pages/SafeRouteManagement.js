@@ -72,7 +72,7 @@ const SafeRouteManagement = () => {
             if (filter.minScore) params.minScore = filter.minScore;
             if (filter.maxScore) params.maxScore = filter.maxScore;
             
-            const response = await adminApi.get('/admin/safe-route/all', { params });
+            const response = await adminApi.safeRoute.list(params);
             if (response.data.success) {
                 setRoutes(response.data.data);
                 setTotalCount(response.data.total);
@@ -86,7 +86,7 @@ const SafeRouteManagement = () => {
 
     const fetchStats = async () => {
         try {
-            const response = await adminApi.get('/admin/safe-route/stats');
+            const response = await adminApi.safeRoute.stats();
             if (response.data.success) {
                 setStats(response.data.data);
             }

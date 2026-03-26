@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { adminApi } from '../../services/api';
+import { adminApi, ENDPOINTS } from '../../services/api';
 
 // Define user roles
 export const USER_ROLES = {
@@ -32,7 +32,9 @@ export const loginUser = createAsyncThunk(
     'auth/login',
     async ({ email, password }, { rejectWithValue }) => {
         try {
+            console.log('LOGIN REQUEST: Calling', ENDPOINTS.auth.login, 'with', { email });
             const response = await adminApi.login({ email, password });
+            console.log('LOGIN RESPONSE:', response.data);
 
             if (response.data.success) {
                 localStorage.setItem('adminToken', response.data.token);
@@ -45,8 +47,9 @@ export const loginUser = createAsyncThunk(
             // Login failed with error message from server
             return rejectWithValue(response.data.message || 'Login failed');
         } catch (error) {
+            console.error('LOGIN ERROR:', error);
             // Network error or server not running
-            const errorMessage = error.message || 'Unable to connect to server. Please check your connection.';
+            const errorMessage = error.response?.data?.message || error.message || 'Unable to connect to server. Please check your connection.';
             return rejectWithValue(errorMessage);
         }
     }

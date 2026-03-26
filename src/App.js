@@ -139,11 +139,11 @@ const AppContent = () => {
             )}
             <Suspense fallback={<LoadingView />}>
                 <Routes>
-                    <Route path="/" element={<LandingPage />} />
+                    {/* <Route path="/" element={<LandingPage />} />
                     <Route path="/features" element={<FeaturesPage />} />
                     <Route path="/how-it-works" element={<HowItWorksPage />} />
-                    <Route path="/about" element={<AboutPage />} />
-                    <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+                    <Route path="/about" element={<AboutPage />} /> */}
+                    <Route path="/" element={<PublicRoute><Login /></PublicRoute>} />
                     <Route path="/*" element={
                         <ProtectedRoute>
                             <AdminLayout>
@@ -171,19 +171,19 @@ const AppContent = () => {
                                         <Route path="/tracking/family" element={<FamilyTracking />} />
                                         <Route path="/tracking/history" element={<LocationHistory />} />
                                         <Route path="/tracking/geofencing" element={<Geofencing />} />
-                                        
+
                                         {/* Child Care Routes */}
                                         <Route path="/childcare" element={<ChildCareManagement />} />
-                                        
+
                                         {/* QR Routes */}
                                         <Route path="/qr-management" element={<AdminRoute><QRManagement /></AdminRoute>} />
-                                        
+
                                         {/* Safe Route Routes */}
                                         <Route path="/safe-route" element={<AdminRoute><SafeRouteManagement /></AdminRoute>} />
-                                        
+
                                         {/* Theme Routes */}
                                         <Route path="/theme-management" element={<AdminRoute><ThemeManagement /></AdminRoute>} />
-                                        
+
                                         <Route path="*" element={<Navigate to="/dashboard" replace />} />
                                     </Routes>
                                 </Suspense>
