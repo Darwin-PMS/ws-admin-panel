@@ -157,6 +157,13 @@ const trackingSlice = createSlice({
         setEmergencyServices: (state, action) => {
             state.emergencyServices = action.payload;
         },
+        setLocations: (state, action) => {
+            state.locations = action.payload || [];
+            state.lastUpdated = new Date().toISOString();
+        },
+        setSOSAlerts: (state, action) => {
+            state.sosAlerts = action.payload || [];
+        },
     },
     extraReducers: (builder) => {
         builder
@@ -208,6 +215,8 @@ export const {
     addSOSAlert,
     setUserHistory,
     setEmergencyServices,
+    setLocations,
+    setSOSAlerts,
 } = trackingSlice.actions;
 
 export const selectTracking = (state) => state.tracking;

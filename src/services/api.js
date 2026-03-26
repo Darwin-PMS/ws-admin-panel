@@ -295,6 +295,9 @@ export const adminApi = {
   post: (url, data) => api.post(url, data),
   put: (url, data) => api.put(url, data),
   delete: (url) => api.delete(url),
+  
+  // Tasks (if available)
+  getTasks: (params) => api.get(`${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/admin/tasks`, { params }).catch(() => ({ data: { success: false, tasks: [] } })),
 };
 
 export { ENDPOINTS, API_CONFIG };

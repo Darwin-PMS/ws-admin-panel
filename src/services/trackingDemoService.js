@@ -4,8 +4,24 @@
  * For production, replace with actual WebSocket/Firebase real-time updates
  */
 
+// Generate a unique ID
+const generateId = () => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+};
+
+// Cache for demo data to ensure consistent keys
+let cachedLocations = null;
+let cachedSOSAlerts = null;
+let cachedTasks = null;
+
 // Sample user locations (simulated)
 const generateDemoLocations = () => {
+    if (cachedLocations) return cachedLocations;
+    
     const baseLocations = [
         { city: 'Delhi', lat: 28.6139, lng: 77.2090 },
         { city: 'Mumbai', lat: 19.0760, lng: 72.8777 },
@@ -17,31 +33,37 @@ const generateDemoLocations = () => {
         { city: 'Ahmedabad', lat: 23.0225, lng: 72.5714 },
     ];
 
-    return baseLocations.map((loc, index) => ({
-        user_id: index + 1,
-        name: `User ${index + 1}`,
-        email: `user${index + 1}@example.com`,
-        phone: `+91${Math.floor(Math.random() * 9000000000 + 1000000000)}`,
-        profile_photo: null,
-        latitude: loc.lat + (Math.random() - 0.5) * 0.1,
-        longitude: loc.lng + (Math.random() - 0.5) * 0.1,
-        status: Math.random() > 0.8 ? 'danger' : Math.random() > 0.95 ? 'sos' : 'safe',
-        last_updated: new Date(Date.now() - Math.random() * 30 * 60 * 1000).toISOString(),
-        address: `${loc.city}, India`,
-        family: {
-            id: Math.floor(Math.random() * 5) + 1,
-            name: `Family ${Math.floor(Math.random() * 5) + 1}`,
-            members: 3,
-        },
-        emergency_contacts: [
-            {
-                name: `Emergency Contact ${index + 1}`,
-                relationship: 'Spouse',
-                phone: `+91${Math.floor(Math.random() * 9000000000 + 1000000000)}`,
+    cachedLocations = baseLocations.map((loc, index) => {
+        const uniqueId = generateId();
+        return {
+            id: uniqueId,
+            user_id: `user-${uniqueId}`,
+            name: `User ${index + 1}`,
+            email: `user${index + 1}@example.com`,
+            phone: `+91${Math.floor(Math.random() * 9000000000 + 1000000000)}`,
+            profile_photo: null,
+            latitude: loc.lat + (Math.random() - 0.5) * 0.1,
+            longitude: loc.lng + (Math.random() - 0.5) * 0.1,
+            status: Math.random() > 0.8 ? 'danger' : Math.random() > 0.95 ? 'sos' : 'safe',
+            last_updated: new Date(Date.now() - Math.random() * 30 * 60 * 1000).toISOString(),
+            address: `${loc.city}, India`,
+            family: {
+                id: generateId(),
+                name: `Family ${Math.floor(Math.random() * 5) + 1}`,
+                members: 3,
             },
-        ],
-        safety_score: Math.floor(Math.random() * 40) + 60,
-    }));
+            emergency_contacts: [
+                {
+                    name: `Emergency Contact ${index + 1}`,
+                    relationship: 'Spouse',
+                    phone: `+91${Math.floor(Math.random() * 9000000000 + 1000000000)}`,
+                },
+            ],
+            safety_score: Math.floor(Math.random() * 40) + 60,
+        };
+    });
+    
+    return cachedLocations;
 };
 
 // Generate location history (path)
@@ -186,6 +208,15 @@ const generateHeatmapData = () => {
     }));
 };
 
+// Generate tasks for demo
+const generateDemoTasks = () => {
+    return [
+        { id: 1, title: 'Safety Check', description: 'Check on user safety status', status: 'in_progress', assigned_to: { id: 1, name: 'Admin' }, due_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() },
+        { id: 2, title: 'Family Update', description: 'Update family contact information', status: 'pending', assigned_to: { id: 1, name: 'Admin' }, due_date: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString() },
+        { id: 3, title: 'Location Review', description: 'Review recent location history', status: 'completed', assigned_to: { id: 1, name: 'Admin' }, due_date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() },
+    ];
+};
+
 // Export demo data generators
 export const demoTrackingData = {
     getLocations: generateDemoLocations,
@@ -194,6 +225,7 @@ export const demoTrackingData = {
     getEmergencyServices: generateEmergencyServices,
     simulateLocationUpdate: simulateLocationUpdate,
     getHeatmapData: generateHeatmapData,
+    getTasks: generateDemoTasks,
 };
 
 export default demoTrackingData;
