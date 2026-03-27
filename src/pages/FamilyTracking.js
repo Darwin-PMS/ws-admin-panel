@@ -57,7 +57,7 @@ const FamilyTracking = () => {
     const [membersLoading, setMembersLoading] = useState({});
     const [expandedFamily, setExpandedFamily] = useState(null);
     const [useDemoData, setUseDemoData] = useState(false);
-    
+
     // Drawer state
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [selectedUserId, setSelectedUserId] = useState(null);
@@ -67,7 +67,7 @@ const FamilyTracking = () => {
             setLoading(true);
             setError(null);
             const response = await adminApi.getFamilies();
-            
+
             if (response.data && (response.data.success === true || response.data.families || response.data.data)) {
                 const allFamilies = response.data.families || response.data.data || [];
                 const activeFamilies = allFamilies.filter(f => f.status === 'active' || f.status === undefined);
@@ -93,7 +93,7 @@ const FamilyTracking = () => {
                 { city: 'Mumbai', lat: 19.0760, lng: 72.8777 },
                 { city: 'Bangalore', lat: 12.9716, lng: 77.5946 },
             ];
-            
+
             familyNames.forEach((name, index) => {
                 const memberCount = Math.floor(Math.random() * 3) + 2;
                 const members = [];
@@ -122,7 +122,7 @@ const FamilyTracking = () => {
                     members: members,
                 });
             });
-            
+
             setFamilies(demoFamilies);
             console.log('Loaded demo families:', demoFamilies.length);
         } finally {
@@ -162,7 +162,7 @@ const FamilyTracking = () => {
 
     const loadFamilyMembers = async (familyId) => {
         if (familyMembers[familyId]) return;
-        
+
         setMembersLoading(prev => ({ ...prev, [familyId]: true }));
         try {
             const response = await adminApi.getFamilyById(familyId).catch(() => {
@@ -170,7 +170,7 @@ const FamilyTracking = () => {
                 const demoFamily = demoFamiliesData.getFamilyById(familyId);
                 return { data: demoFamily || { members: [] } };
             });
-            
+
             if (response.data.success || response.data.members || response.data.family_members) {
                 const members = response.data.members || response.data.family_members || [];
                 setFamilyMembers(prev => ({ ...prev, [familyId]: members }));
@@ -215,7 +215,7 @@ const FamilyTracking = () => {
     const getFamilyMemberCount = (familyId) => {
         const members = familyMembers[familyId];
         if (Array.isArray(members)) return members.length;
-        
+
         // Try to get from family object
         const family = families.find(f => f.id === familyId);
         if (family?.members) return family.members.length;
@@ -226,10 +226,10 @@ const FamilyTracking = () => {
     const getFamilyOnlineCount = (familyId) => {
         const members = familyMembers[familyId];
         if (Array.isArray(members)) {
-            return members.filter((m) => m.is_online || (m.last_updated && 
+            return members.filter((m) => m.is_online || (m.last_updated &&
                 (Date.now() - new Date(m.last_updated).getTime()) < 300000)).length;
         }
-        
+
         // Try from family object
         const family = families.find(f => f.id === familyId);
         if (family?.members) {
@@ -255,9 +255,9 @@ const FamilyTracking = () => {
                         Family Tracking
                     </Typography>
                     {useDemoData && (
-                        <Chip 
-                            label="Demo Data" 
-                            color="warning" 
+                        <Chip
+                            label="Demo Data"
+                            color="warning"
                             size="small"
                             sx={{ ml: 1 }}
                         />
@@ -275,7 +275,7 @@ const FamilyTracking = () => {
             <Card sx={{ mb: 3 }}>
                 <CardContent>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                        {useDemoData 
+                        {useDemoData
                             ? 'Showing demo data. Connect to backend API for real data.'
                             : 'Select a family to view all members\' real-time locations on the map.'
                         }
