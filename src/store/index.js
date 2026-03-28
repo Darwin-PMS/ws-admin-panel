@@ -15,6 +15,7 @@ import settingsReducer from './slices/settingsSlice';
 import trackingReducer from './slices/trackingSlice';
 import grievanceReducer from './slices/grievanceSlice';
 import menusReducer from './slices/menusSlice';
+import zonesReducer from './slices/zonesSlice';
 
 const persistConfig = {
     key: 'root',
@@ -37,6 +38,7 @@ const rootReducer = combineReducers({
     tracking: trackingReducer,
     grievance: grievanceReducer,
     menus: menusReducer,
+    zones: zonesReducer,
 });
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

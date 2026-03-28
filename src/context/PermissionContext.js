@@ -7,6 +7,7 @@ export const ROLES = {
     AGENCY_ADMIN: 'agency_admin',
     ADMIN: 'admin',
     SUPERVISOR: 'supervisor',
+    ZONE_HEAD: 'zone_head',
     WOMAN: 'woman',
     PARENT: 'parent',
     GUARDIAN: 'guardian',
@@ -45,14 +46,19 @@ export const PERMISSIONS = {
     TRACKING_HISTORY: 'tracking.history',
     TRACKING_GEOFENCE: 'tracking.geofence',
     QR_MANAGE: 'qr.manage',
+    ZONES_VIEW: 'zones.view',
+    ZONES_CREATE: 'zones.create',
+    ZONES_EDIT: 'zones.edit',
+    ZONES_DELETE: 'zones.delete',
 };
 
 // Role hierarchy (higher number = more powerful)
 const ROLE_HIERARCHY = {
-    [ROLES.SYSTEM_ADMIN]: 7,
-    [ROLES.AGENCY_ADMIN]: 6,
-    [ROLES.ADMIN]: 5,
-    [ROLES.SUPERVISOR]: 4,
+    [ROLES.SYSTEM_ADMIN]: 8,
+    [ROLES.AGENCY_ADMIN]: 7,
+    [ROLES.ADMIN]: 6,
+    [ROLES.SUPERVISOR]: 5,
+    [ROLES.ZONE_HEAD]: 4,
     [ROLES.PARENT]: 3,
     [ROLES.GUARDIAN]: 2,
     [ROLES.WOMAN]: 1,
@@ -64,6 +70,7 @@ const ROLE_DISPLAY_NAMES = {
     [ROLES.AGENCY_ADMIN]: 'Agency Administrator',
     [ROLES.ADMIN]: 'Administrator',
     [ROLES.SUPERVISOR]: 'Supervisor',
+    [ROLES.ZONE_HEAD]: 'Zone Head',
     [ROLES.PARENT]: 'Parent',
     [ROLES.GUARDIAN]: 'Guardian',
     [ROLES.WOMAN]: 'Women Safety User',
@@ -71,7 +78,7 @@ const ROLE_DISPLAY_NAMES = {
 
 // Default role permissions
 const ROLE_PERMISSIONS = {
-    [ROLES.SYSTEM_ADMIN]: Object.values(PERMISSIONS),
+    [ROLES.SYSTEM_ADMIN]: [...Object.values(PERMISSIONS), PERMISSIONS.ZONES_VIEW, PERMISSIONS.ZONES_CREATE, PERMISSIONS.ZONES_EDIT, PERMISSIONS.ZONES_DELETE],
     [ROLES.AGENCY_ADMIN]: [
         PERMISSIONS.USERS_VIEW, PERMISSIONS.USERS_CREATE, PERMISSIONS.USERS_EDIT,
         PERMISSIONS.SOS_VIEW, PERMISSIONS.SOS_RESOLVE,
@@ -85,6 +92,7 @@ const ROLE_PERMISSIONS = {
         PERMISSIONS.REPORTS_VIEW, PERMISSIONS.REPORTS_EXPORT,
         PERMISSIONS.TRACKING_VIEW, PERMISSIONS.TRACKING_CONTROL, PERMISSIONS.TRACKING_HISTORY, PERMISSIONS.TRACKING_GEOFENCE,
         PERMISSIONS.QR_MANAGE,
+        PERMISSIONS.ZONES_VIEW, PERMISSIONS.ZONES_CREATE, PERMISSIONS.ZONES_EDIT, PERMISSIONS.ZONES_DELETE,
     ],
     [ROLES.ADMIN]: [
         PERMISSIONS.USERS_VIEW, PERMISSIONS.USERS_CREATE, PERMISSIONS.USERS_EDIT,
@@ -100,6 +108,7 @@ const ROLE_PERMISSIONS = {
         PERMISSIONS.REPORTS_VIEW,
         PERMISSIONS.TRACKING_VIEW, PERMISSIONS.TRACKING_CONTROL, PERMISSIONS.TRACKING_HISTORY, PERMISSIONS.TRACKING_GEOFENCE,
         PERMISSIONS.QR_MANAGE,
+        PERMISSIONS.ZONES_VIEW, PERMISSIONS.ZONES_CREATE, PERMISSIONS.ZONES_EDIT, PERMISSIONS.ZONES_DELETE,
     ],
     [ROLES.SUPERVISOR]: [
         PERMISSIONS.USERS_VIEW,
@@ -113,6 +122,14 @@ const ROLE_PERMISSIONS = {
         PERMISSIONS.SETTINGS_VIEW,
         PERMISSIONS.REPORTS_VIEW,
         PERMISSIONS.TRACKING_VIEW, PERMISSIONS.TRACKING_HISTORY,
+    ],
+    [ROLES.ZONE_HEAD]: [
+        PERMISSIONS.SOS_VIEW,
+        PERMISSIONS.SOS_RESOLVE,
+        PERMISSIONS.GRIEVANCES_VIEW, PERMISSIONS.GRIEVANCES_RESOLVE,
+        PERMISSIONS.ANALYTICS_VIEW,
+        PERMISSIONS.FAMILIES_VIEW,
+        PERMISSIONS.TRACKING_VIEW,
     ],
     [ROLES.WOMAN]: [
         PERMISSIONS.SOS_VIEW,
@@ -350,6 +367,14 @@ export const PermissionProvider = ({ children }) => {
                 icon: 'Palette',
                 path: '/theme-management',
                 permission: PERMISSIONS.SETTINGS_EDIT,
+                roles: [ROLES.SYSTEM_ADMIN, ROLES.AGENCY_ADMIN, ROLES.ADMIN],
+            },
+            {
+                key: 'zones',
+                label: 'Zone Management',
+                icon: 'Map',
+                path: '/zones',
+                permission: PERMISSIONS.ZONES_VIEW,
                 roles: [ROLES.SYSTEM_ADMIN, ROLES.AGENCY_ADMIN, ROLES.ADMIN],
             },
             {

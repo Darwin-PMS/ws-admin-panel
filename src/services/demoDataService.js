@@ -41,6 +41,7 @@ const generateDemoFamilies = () => {
             
             const loc = baseLocations[Math.floor(Math.random() * baseLocations.length)];
             const isOnline = Math.random() > 0.3;
+            const avatarId = (index * memberCount + i + 1) % 70 + 1;
             
             members.push({
                 id: `user-${index}-${i}`,
@@ -50,8 +51,8 @@ const generateDemoFamilies = () => {
                 name: '',
                 email: `member${index}${i}@example.com`,
                 phone: `+91${Math.floor(Math.random() * 9000000000 + 1000000000)}`,
-                profile_photo: null,
-                avatar: null,
+                profile_photo: `https://i.pravatar.cc/150?img=${avatarId}`,
+                avatar: `https://i.pravatar.cc/150?img=${avatarId}`,
                 relation: relations[i % relations.length],
                 relationship: relations[i % relations.length],
                 latitude: loc.lat + (Math.random() - 0.5) * 0.05,
@@ -79,18 +80,21 @@ const generateDemoFamilies = () => {
 };
 
 const generateDemoUserData = (userId) => {
-    const firstNames = ['Rahul', 'Priya', 'Amit', 'Sunita', 'Vikram', 'Anjali', 'Raj', 'Meera'];
+    const firstNames = ['Rahul', 'Priya', 'Amit', 'Sunita', 'Vikram', 'Anjali', 'Raj', 'Meera', 'Priya', 'Anita', 'Kavitha', 'Meera'];
     const lastNames = ['Sharma', 'Patel', 'Singh', 'Kumar', 'Verma', 'Gupta', 'Joshi', 'Mehta'];
     
     const baseLocations = [
         { city: 'Delhi', lat: 28.6139, lng: 77.2090 },
         { city: 'Mumbai', lat: 19.0760, lng: 72.8777 },
         { city: 'Bangalore', lat: 12.9716, lng: 77.5946 },
+        { city: 'Chennai', lat: 13.0827, lng: 80.2707 },
+        { city: 'Hyderabad', lat: 17.3850, lng: 78.4867 },
     ];
     
     const loc = baseLocations[Math.floor(Math.random() * baseLocations.length)];
     const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
     const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
+    const avatarId = Math.floor(Math.random() * 70) + 1;
 
     return {
         id: userId,
@@ -101,8 +105,8 @@ const generateDemoUserData = (userId) => {
         email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@example.com`,
         phone: `+91${Math.floor(Math.random() * 9000000000 + 1000000000)}`,
         role: 'woman',
-        profile_photo: null,
-        avatar: null,
+        profile_photo: `https://i.pravatar.cc/150?img=${avatarId}`,
+        avatar: `https://i.pravatar.cc/150?img=${avatarId}`,
         is_verified: true,
         is_active: true,
         is_online: Math.random() > 0.3,
@@ -113,8 +117,8 @@ const generateDemoUserData = (userId) => {
         current_location: `${loc.city}, India`,
         address: `${loc.city}, India`,
         family_members: [
-            { id: 'fm-1', name: 'Father', relation: 'Father', profile_photo: null },
-            { id: 'fm-2', name: 'Mother', relation: 'Mother', profile_photo: null },
+            { id: 'fm-1', name: 'Father', relation: 'Father', profile_photo: `https://i.pravatar.cc/150?img=33` },
+            { id: 'fm-2', name: 'Mother', relation: 'Mother', profile_photo: `https://i.pravatar.cc/150?img=5` },
         ],
         recent_locations: [
             { latitude: loc.lat, longitude: loc.lng, address: `${loc.city}`, timestamp: new Date().toISOString() },

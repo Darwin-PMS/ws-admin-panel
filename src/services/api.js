@@ -223,6 +223,14 @@ export const adminApi = {
     getSchoolZones: (params) => api.get(ENDPOINTS.childcare.schoolZones, { params }),
   },
 
+  zones: {
+    list: (params) => api.get(ENDPOINTS.zones.list, { params }),
+    get: (id) => api.get(ENDPOINTS.zones.get(id)),
+    create: (data) => api.post(ENDPOINTS.zones.create, data),
+    update: (id, data) => api.put(ENDPOINTS.zones.update(id), data),
+    delete: (id) => api.delete(ENDPOINTS.zones.delete(id)),
+  },
+
   // Backward compatibility aliases - matches existing slice method names
   login: (credentials) => api.post(ENDPOINTS.auth.login, credentials),
   logout: () => api.post(ENDPOINTS.auth.logout),
@@ -313,6 +321,13 @@ export const adminApi = {
   
   // Tasks (if available)
   getTasks: (params) => api.get(`${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/admin/tasks`, { params }).catch(() => ({ data: { success: false, tasks: [] } })),
+
+  // Zones
+  getZones: (params) => api.get(ENDPOINTS.zones.list, { params }),
+  getZoneById: (id) => api.get(ENDPOINTS.zones.get(id)),
+  createZone: (data) => api.post(ENDPOINTS.zones.create, data),
+  updateZone: (id, data) => api.put(ENDPOINTS.zones.update(id), data),
+  deleteZone: (id) => api.delete(ENDPOINTS.zones.delete(id)),
 };
 
 export { ENDPOINTS, API_CONFIG };

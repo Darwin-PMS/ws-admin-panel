@@ -159,6 +159,13 @@ export const ENDPOINTS = {
     alerts: `${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/admin/childcare/alerts`,
     schoolZones: `${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/admin/childcare/school-zones`,
   },
+  zones: {
+    list: `${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/mobile/admin/zones`,
+    get: (id) => `${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/mobile/admin/zones/${id}`,
+    create: `${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/mobile/admin/zones`,
+    update: (id) => `${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/mobile/admin/zones/${id}`,
+    delete: (id) => `${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/mobile/admin/zones/${id}`,
+  },
 };
 
 export default ENDPOINTS;

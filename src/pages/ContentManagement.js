@@ -93,6 +93,7 @@ const ContentManagement = () => {
     const [success, setSuccess] = useState(null);
     const [localError, setLocalError] = useState(null);
     const [dialog, setDialog] = useState({ open: false, mode: 'create', data: null });
+    const [submitting, setSubmitting] = useState(false);
 
     const [formData, setFormData] = useState({
         title: '', description: '', content: '', category: '',
@@ -168,30 +169,27 @@ const ContentManagement = () => {
     const handleSubmit = async () => {
         setLocalError(null);
         setSuccess(null);
+        setSubmitting(true);
         const id = dialog.data?.id;
+        console.log('Submitting:', { mode: dialog.mode, id, currentTab, formData });
 
         try {
+            let result;
             switch (currentTab) {
                 case 0:
-                    if (dialog.mode === 'create') {
-                        await dispatch(createTutorial(formData)).unwrap();
-                    } else {
-                        await dispatch(updateTutorial({ id, data: formData })).unwrap();
-                    }
+                    result = dialog.mode === 'create'
+                        ? await dispatch(createTutorial(formData)).unwrap()
+                        : await dispatch(updateTutorial({ id, data: formData })).unwrap();
                     break;
                 case 1:
-                    if (dialog.mode === 'create') {
-                        await dispatch(createNews(formData)).unwrap();
-                    } else {
-                        await dispatch(updateNews({ id, data: formData })).unwrap();
-                    }
+                    result = dialog.mode === 'create'
+                        ? await dispatch(createNews(formData)).unwrap()
+                        : await dispatch(updateNews({ id, data: formData })).unwrap();
                     break;
                 case 2:
-                    if (dialog.mode === 'create') {
-                        await dispatch(createLaw(formData)).unwrap();
-                    } else {
-                        await dispatch(updateLaw({ id, data: formData })).unwrap();
-                    }
+                    result = dialog.mode === 'create'
+                        ? await dispatch(createLaw(formData)).unwrap()
+                        : await dispatch(updateLaw({ id, data: formData })).unwrap();
                     break;
                 case 3:
                     const helplineData = {
@@ -200,18 +198,24 @@ const ContentManagement = () => {
                         service_type: formData.service_type, display_order: formData.display_order,
                         icon: formData.icon, is_active: formData.is_active
                     };
-                    if (dialog.mode === 'create') {
-                        await dispatch(createHelpline(helplineData)).unwrap();
-                    } else {
-                        await dispatch(updateHelpline({ id, data: helplineData })).unwrap();
-                    }
+                    result = dialog.mode === 'create'
+                        ? await dispatch(createHelpline(helplineData)).unwrap()
+                        : await dispatch(updateHelpline({ id, data: helplineData })).unwrap();
                     break;
                 default: break;
             }
-            setSuccess('Operation successful');
-            setTimeout(() => { closeDialog(); fetchData(); }, 1000);
+            console.log('Submit success:', result);
+            setSuccess(dialog.mode === 'create' ? 'Created successfully!' : 'Updated successfully!');
+            setTimeout(() => {
+                closeDialog();
+                fetchData();
+            }, 600);
         } catch (err) {
-            setLocalError(err || 'Operation failed');
+            console.error('Submit error:', err);
+            const errorMsg = err?.data?.message || err?.message || 'Operation failed. Please try again.';
+            setLocalError(errorMsg);
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -306,6 +310,7 @@ const ContentManagement = () => {
     );
 
     const renderContentCard = (item) => {
+        if (!item) return null;
         const tabIcon = TAB_ICONS[currentTab];
         const title = item.title || item.name;
         const category = item.category || item.service_type;
@@ -422,7 +427,7 @@ const ContentManagement = () => {
                 </Box>
             </Box>
 
-            {localError && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setLocalError(null)}>{localError}</Alert>}
+            {localError && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setLocalError(null)}>{typeof localError === 'object' ? localError.message || 'An error occurred' : localError}</Alert>}
             {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess(null)}>{success}</Alert>}
 
             <Grid container spacing={2} sx={{ mb: 3 }}>
@@ -507,8 +512,8 @@ const ContentManagement = () => {
                         </Card>
                     </Grid>
                 ) : (
-                    currentContent.map((item) => (
-                        <Grid item xs={12} sm={6} md={4} lg={3} key={item.id}>
+                    currentContent.filter(Boolean).map((item) => (
+                        <Grid item xs={12} sm={6} md={4} lg={3} key={item?.id || Math.random()}>
                             {renderContentCard(item)}
                         </Grid>
                     ))
@@ -542,9 +547,9 @@ const ContentManagement = () => {
                         {currentTab === 3 && renderHelplineForm()}
                     </Box>
                     <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>
-                        <Button onClick={closeDialog} fullWidth>Cancel</Button>
-                        <Button variant="contained" onClick={handleSubmit} disabled={loading} fullWidth>
-                            {loading ? 'Saving...' : 'Save'}
+                        <Button onClick={closeDialog} disabled={submitting} fullWidth>Cancel</Button>
+                        <Button variant="contained" onClick={handleSubmit} disabled={submitting} fullWidth>
+                            {submitting ? <CircularProgress size={24} color="inherit" /> : 'Save'}
                         </Button>
                     </Box>
                 </Box>

@@ -1,10 +1,10 @@
-import React, { useEffect, Suspense, lazy } from 'react';
+import React, { useEffect, Suspense, lazy, useMemo } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ThemeProvider, createTheme, CssBaseline, CircularProgress, Box, Alert, AlertTitle } from '@mui/material';
 import { Provider, useSelector, useDispatch } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import { store, persistor } from './store';
-import { checkAuth, logout, clearError, USER_ROLES, isAdminRole, selectAuthError } from './store/slices/authSlice';
+import { checkAuth, logout, clearError, isAdminRole, selectAuthError } from './store/slices/authSlice';
 
 import AdminLayout from './components/Layout/AdminLayout';
 import { PermissionProvider } from './context/PermissionContext';
@@ -17,18 +17,24 @@ const LoadingView = () => (
     </Box>
 );
 
-const theme = createTheme({
+const getTheme = (mode) => createTheme({
     palette: {
-        mode: 'dark',
+        mode,
         primary: { main: '#6366f1', light: '#818cf8', dark: '#4f46e5' },
         secondary: { main: '#ec4899', light: '#f472b6', dark: '#db2777' },
-        background: { default: '#0f172a', paper: '#1e293b' },
         success: { main: '#10b981' },
         warning: { main: '#f59e0b' },
         error: { main: '#ef4444' },
         info: { main: '#06b6d4' },
-        text: { primary: '#f8fafc', secondary: '#94a3b8' },
-        divider: 'rgba(148, 163, 184, 0.1)',
+        ...(mode === 'dark' ? {
+            background: { default: '#0f172a', paper: '#1e293b' },
+            text: { primary: '#f8fafc', secondary: '#94a3b8' },
+            divider: 'rgba(148, 163, 184, 0.1)',
+        } : {
+            background: { default: '#f8fafc', paper: '#ffffff' },
+            text: { primary: '#0f172a', secondary: '#64748b' },
+            divider: 'rgba(100, 116, 139, 0.1)',
+        }),
     },
     typography: {
         fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
@@ -47,9 +53,9 @@ const theme = createTheme({
     components: {
         MuiButton: {
             styleOverrides: {
-                root: { 
-                    textTransform: 'none', 
-                    borderRadius: 8, 
+                root: {
+                    textTransform: 'none',
+                    borderRadius: 8,
                     fontWeight: 500,
                     boxShadow: 'none',
                     '&:hover': { boxShadow: 'none' },
@@ -64,15 +70,15 @@ const theme = createTheme({
                 disableElevation: true,
             },
         },
-        MuiPaper: { 
-            styleOverrides: { 
-                root: { borderRadius: 12 } 
-            } 
+        MuiPaper: {
+            styleOverrides: {
+                root: { borderRadius: 12 }
+            }
         },
-        MuiCard: { 
-            styleOverrides: { 
-                root: { borderRadius: 12 } 
-            } 
+        MuiCard: {
+            styleOverrides: {
+                root: { borderRadius: 12 }
+            }
         },
         MuiChip: {
             styleOverrides: {
@@ -85,13 +91,16 @@ const theme = createTheme({
         MuiTooltip: {
             styleOverrides: {
                 tooltip: {
-                    backgroundColor: '#1e293b',
+                    backgroundColor: mode === 'dark' ? '#1e293b' : '#ffffff',
+                    color: mode === 'dark' ? '#f8fafc' : '#0f172a',
                     fontSize: '0.75rem',
                     padding: '8px 12px',
                     borderRadius: 6,
+                    border: '1px solid',
+                    borderColor: mode === 'dark' ? 'rgba(148, 163, 184, 0.1)' : 'rgba(100, 116, 139, 0.1)',
                 },
                 arrow: {
-                    color: '#1e293b',
+                    color: mode === 'dark' ? '#1e293b' : '#ffffff',
                 },
             },
         },
@@ -99,12 +108,12 @@ const theme = createTheme({
             styleOverrides: {
                 root: {
                     '& .MuiTableCell-head': {
-                        backgroundColor: 'rgba(99, 102, 241, 0.05)',
+                        backgroundColor: mode === 'dark' ? 'rgba(99, 102, 241, 0.05)' : 'rgba(99, 102, 241, 0.08)',
                         fontWeight: 600,
                         fontSize: '0.75rem',
                         textTransform: 'uppercase',
                         letterSpacing: '0.05em',
-                        color: '#94a3b8',
+                        color: mode === 'dark' ? '#94a3b8' : '#64748b',
                     },
                 },
             },
@@ -112,7 +121,7 @@ const theme = createTheme({
         MuiTableCell: {
             styleOverrides: {
                 root: {
-                    borderBottom: '1px solid rgba(148, 163, 184, 0.1)',
+                    borderBottom: mode === 'dark' ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(100, 116, 139, 0.1)',
                     padding: '12px 16px',
                 },
             },
@@ -211,6 +220,8 @@ const ChildCareManagement = lazy(() => import('./pages/ChildCareManagement'));
 const QRManagement = lazy(() => import('./pages/QRManagement'));
 const SafeRouteManagement = lazy(() => import('./pages/SafeRouteManagement'));
 const ThemeManagement = lazy(() => import('./pages/ThemeManagement'));
+const ZoneManagement = lazy(() => import('./pages/ZoneManagement'));
+const ZoneDetails = lazy(() => import('./pages/ZoneDetails'));
 
 const PageLoader = () => (
     <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
@@ -220,6 +231,7 @@ const PageLoader = () => (
 
 const AppContent = () => {
     const authError = useSelector((state) => state.auth.error);
+    const themeMode = useSelector((state) => state.ui?.theme || 'dark');
     const dispatch = useDispatch();
 
     useEffect(() => {
@@ -231,6 +243,8 @@ const AppContent = () => {
     }, [dispatch]);
 
     const handleClearError = () => dispatch(clearError());
+
+    const theme = useMemo(() => getTheme(themeMode), [themeMode]);
 
     return (
         <ThemeProvider theme={theme}>
@@ -287,6 +301,10 @@ const AppContent = () => {
 
                                         {/* Theme Routes */}
                                         <Route path="/theme-management" element={<AdminRoute><ThemeManagement /></AdminRoute>} />
+
+                                        {/* Zone Routes */}
+                                        <Route path="/zones" element={<AdminRoute><ZoneManagement /></AdminRoute>} />
+                                        <Route path="/zones/:id" element={<AdminRoute><ZoneDetails /></AdminRoute>} />
 
                                         <Route path="*" element={<Navigate to="/dashboard" replace />} />
                                     </Routes>

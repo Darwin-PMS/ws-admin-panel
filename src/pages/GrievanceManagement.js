@@ -2,7 +2,6 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
     Box,
     Card,
-    CardContent,
     Typography,
     Button,
     Grid,
@@ -27,10 +26,6 @@ import {
     alpha,
     Avatar,
     Divider,
-    List,
-    ListItem,
-    ListItemAvatar,
-    ListItemText,
     Badge,
     Tooltip,
     InputAdornment,
@@ -45,8 +40,6 @@ import {
     Close as CloseIcon,
     Send as SendIcon,
     Chat as ChatIcon,
-    Person as PersonIcon,
-    AttachFile as AttachFileIcon,
     MoreVert as MoreVertIcon,
     Circle as CircleIcon,
     Support as SupportIcon,
@@ -67,7 +60,6 @@ import {
     clearConversation,
 } from '../store/slices/grievanceSlice';
 import { webSocketService } from '../services/realtime';
-import { adminApi } from '../services/api';
 
 const statusConfig = {
     pending: { color: '#f59e0b', bg: '#fffbeb', label: 'Pending' },
