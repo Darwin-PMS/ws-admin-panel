@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useState } from 'react';
+import React, { useEffect, useCallback, useState, useRef } from 'react';
 import {
     Box,
     Card,
@@ -27,6 +27,12 @@ import {
     Tabs,
     Tab,
     Badge,
+    Switch,
+    FormControlLabel,
+    InputAdornment,
+    CircularProgress,
+    LinearProgress,
+    Grid,
 } from '@mui/material';
 import {
     Warning as WarningIcon,
@@ -36,27 +42,21 @@ import {
     Refresh as RefreshIcon,
     Close as CloseIcon,
     Phone as PhoneIcon,
-    Message as MessageIcon,
     Map as MapIcon,
-    FilterList as FilterIcon,
     NotificationsActive as AlertIcon,
     GppGood as AllClearIcon,
+    VolumeUp as SoundOnIcon,
+    VolumeOff as SoundOffIcon,
+    DoneAll as ResolveAllIcon,
+    FiberManualRecord as LiveIcon,
+    Search as SearchIcon,
+    FilterList as FilterIcon,
+    Sync as SyncIcon,
 } from '@mui/icons-material';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchAlerts, resolveAlert, setStatusFilter } from '../store/slices/alertsSlice';
 import { adminApi } from '../services/api';
-
-const statusConfig = {
-    active: { color: '#ef4444', label: 'Active', bg: '#fef2f2', icon: '🚨' },
-    resolved: { color: '#10b981', label: 'Resolved', bg: '#ecfdf5', icon: '✓' },
-};
-
-const typeConfig = {
-    emergency: { color: '#ef4444', bg: '#fef2f2' },
-    distress: { color: '#f59e0b', bg: '#fffbeb' },
-    test: { color: '#6366f1', bg: '#eef2ff' },
-    medical: { color: '#ec4899', bg: '#fdf2f8' },
-};
+import { AlertCard, AlertStatsBar } from '../components/UI';
 
 const SOSAlerts = () => {
     const dispatch = useDispatch();
@@ -68,14 +68,31 @@ const SOSAlerts = () => {
     const [activeTab, setActiveTab] = useState(0);
     const [selectedAlert, setSelectedAlert] = useState(null);
     const [nearbyServices, setNearbyServices] = useState([]);
+    const [soundEnabled, setSoundEnabled] = useState(false);
+    const [lastUpdated, setLastUpdated] = useState(null);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [refreshCountdown, setRefreshCountdown] = useState(30);
+    const countdownRef = useRef(null);
 
     const fetchAlertsData = useCallback(() => {
         dispatch(fetchAlerts({ status: filters.status !== 'all' ? filters.status : undefined }));
+        setLastUpdated(new Date());
+        setRefreshCountdown(30);
     }, [dispatch, filters.status]);
 
     useEffect(() => {
         fetchAlertsData();
+        const interval = setInterval(fetchAlertsData, 30000);
+        return () => clearInterval(interval);
     }, [fetchAlertsData]);
+
+    useEffect(() => {
+        if (loading) return;
+        countdownRef.current = setInterval(() => {
+            setRefreshCountdown((prev) => (prev > 0 ? prev - 1 : 30));
+        }, 1000);
+        return () => clearInterval(countdownRef.current);
+    }, [loading]);
 
     useEffect(() => {
         if (detailDrawer.alert) {
@@ -94,6 +111,23 @@ const SOSAlerts = () => {
         }
     };
 
+    const handleResolveAll = async () => {
+        const activeAlerts = alerts.filter(a => a.status === 'active');
+        if (activeAlerts.length === 0) return;
+        
+        const confirmed = window.confirm(`Are you sure you want to resolve all ${activeAlerts.length} active alerts?`);
+        if (!confirmed) return;
+
+        for (const alert of activeAlerts) {
+            try {
+                await dispatch(resolveAlert(alert.id)).unwrap();
+            } catch (err) {
+                console.error('Error resolving alert:', err);
+            }
+        }
+        fetchAlertsData();
+    };
+
     const fetchNearbyServices = async (lat, lng) => {
         try {
             const res = await adminApi.getNearbyEmergencyServices({ lat, lng, radius: 10000 });
@@ -110,121 +144,242 @@ const SOSAlerts = () => {
         }
     };
 
+    const handleCallUser = (phone) => {
+        window.open(`tel:${phone}`, '_self');
+    };
+
     const filteredAlerts = alerts.filter(alert => {
         if (activeTab === 1) return alert.status === 'active';
         if (activeTab === 2) return alert.status === 'resolved';
+        
+        if (searchQuery) {
+            const query = searchQuery.toLowerCase();
+            return (
+                alert.userName?.toLowerCase().includes(query) ||
+                alert.userPhone?.toLowerCase().includes(query) ||
+                alert.message?.toLowerCase().includes(query) ||
+                alert.location?.toLowerCase().includes(query)
+            );
+        }
         return true;
     });
 
     const activeAlerts = alerts.filter(a => a.status === 'active').length;
     const resolvedAlerts = alerts.filter(a => a.status === 'resolved').length;
+    const criticalAlerts = alerts.filter(a => a.status === 'active' && a.type === 'emergency').length;
 
-    const formatTime = (dateString) => {
-        if (!dateString) return 'Unknown';
-        const date = new Date(dateString);
+    const formatLastUpdated = () => {
+        if (!lastUpdated) return '';
         const now = new Date();
-        const diff = Math.floor((now - date) / 1000);
-        if (diff < 60) return `${diff}s ago`;
-        if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-        if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-        return date.toLocaleDateString();
+        const diff = Math.floor((now - lastUpdated) / 1000);
+        if (diff < 60) return 'Updated just now';
+        if (diff < 3600) return `Updated ${Math.floor(diff / 60)}m ago`;
+        return `Updated at ${lastUpdated.toLocaleTimeString()}`;
     };
 
     return (
         <Box sx={{ height: 'calc(100vh - 120px)', display: 'flex', flexDirection: 'column' }}>
-            {/* Header */}
             <Box sx={{ mb: 3 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2 }}>
                     <Box>
-                        <Typography variant="h4" sx={{ fontWeight: 800, mb: 0.5 }}>
-                            SOS Alerts
-                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 0.5 }}>
+                            <Typography variant="h4" sx={{ fontWeight: 800 }}>
+                                SOS Alerts
+                            </Typography>
+                            <Chip
+                                icon={<LiveIcon sx={{ fontSize: 12 }} />}
+                                label={activeAlerts > 0 ? `${activeAlerts} Active` : 'All Clear'}
+                                size="small"
+                                sx={{
+                                    bgcolor: activeAlerts > 0 ? alpha('#ef4444', 0.1) : alpha('#10b981', 0.1),
+                                    color: activeAlerts > 0 ? '#ef4444' : '#10b981',
+                                    fontWeight: 600,
+                                    animation: activeAlerts > 0 ? 'pulse 2s infinite' : 'none',
+                                }}
+                            />
+                        </Box>
                         <Typography variant="body2" color="text.secondary">
-                            Monitor and respond to emergency alerts
+                            Monitor and respond to emergency alerts in real-time
                         </Typography>
                     </Box>
-                    <Button
-                        variant="outlined"
-                        startIcon={<RefreshIcon />}
-                        onClick={fetchAlertsData}
-                        disabled={loading}
-                    >
-                        Refresh
-                    </Button>
+                    
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                        <Paper
+                            variant="outlined"
+                            sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1,
+                                px: 1.5,
+                                py: 0.5,
+                                borderRadius: 2,
+                                bgcolor: 'background.paper',
+                            }}
+                        >
+                            <SyncIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                            <Typography variant="caption" color="text.secondary">
+                                Refresh in
+                            </Typography>
+                            <Typography variant="caption" sx={{ fontWeight: 600, color: 'primary.main', minWidth: 20 }}>
+                                {refreshCountdown}s
+                            </Typography>
+                            <LinearProgress
+                                variant="determinate"
+                                value={(refreshCountdown / 30) * 100}
+                                sx={{
+                                    width: 40,
+                                    height: 4,
+                                    borderRadius: 2,
+                                    bgcolor: alpha('#6366f1', 0.1),
+                                    '& .MuiLinearProgress-bar': { bgcolor: '#6366f1', borderRadius: 2 },
+                                }}
+                            />
+                        </Paper>
+
+                        <Tooltip title={soundEnabled ? 'Disable alert sounds' : 'Enable alert sounds'}>
+                            <Paper
+                                variant="outlined"
+                                sx={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 1,
+                                    px: 1.5,
+                                    py: 0.5,
+                                    borderRadius: 2,
+                                    bgcolor: soundEnabled ? alpha('#6366f1', 0.05) : 'transparent',
+                                }}
+                            >
+                                {soundEnabled ? <SoundOnIcon sx={{ fontSize: 18, color: '#6366f1' }} /> : <SoundOffIcon sx={{ fontSize: 18, color: 'text.secondary' }} />}
+                                <FormControlLabel
+                                    control={
+                                        <Switch
+                                            size="small"
+                                            checked={soundEnabled}
+                                            onChange={(e) => setSoundEnabled(e.target.checked)}
+                                            sx={{
+                                                '& .MuiSwitch-switchBase.Mui-checked': { color: '#6366f1' },
+                                                '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#6366f1' },
+                                            }}
+                                        />
+                                    }
+                                    label=""
+                                    sx={{ m: 0 }}
+                                />
+                            </Paper>
+                        </Tooltip>
+
+                        {activeAlerts > 0 && (
+                            <Tooltip title={`Resolve all ${activeAlerts} active alerts`}>
+                                <Button
+                                    variant="contained"
+                                    color="success"
+                                    size="small"
+                                    startIcon={<ResolveAllIcon />}
+                                    onClick={handleResolveAll}
+                                    sx={{ fontWeight: 600 }}
+                                >
+                                    Resolve All
+                                </Button>
+                            </Tooltip>
+                        )}
+
+                        <Button
+                            variant="outlined"
+                            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
+                            onClick={fetchAlertsData}
+                            disabled={loading}
+                        >
+                            Refresh
+                        </Button>
+                    </Box>
                 </Box>
             </Box>
 
-            {/* Stats Cards */}
-            <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap' }}>
-                <Paper
-                    elevation={0}
-                    sx={{
-                        flex: '1 1 200px',
-                        p: 2,
-                        borderRadius: 3,
-                        background: activeAlerts > 0 ? alpha('#ef4444', 0.1) : alpha('#10b981', 0.1),
-                        border: `1px solid ${activeAlerts > 0 ? alpha('#ef4444', 0.3) : alpha('#10b981', 0.3)}`,
-                    }}
-                >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: activeAlerts > 0 ? '#ef4444' : '#10b981', color: 'white' }}>
-                            {activeAlerts > 0 ? <WarningIcon /> : <AllClearIcon />}
-                        </Box>
-                        <Box>
-                            <Typography variant="h4" sx={{ fontWeight: 800, color: activeAlerts > 0 ? '#ef4444' : '#10b981' }}>
-                                {loading ? <Skeleton width={40} /> : activeAlerts}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">Active Alerts</Typography>
-                        </Box>
-                    </Box>
-                </Paper>
-                <Paper elevation={0} sx={{ flex: '1 1 200px', p: 2, borderRadius: 3, bgcolor: alpha('#10b981', 0.1) }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: '#10b981', color: 'white' }}>
-                            <CheckCircleIcon />
-                        </Box>
-                        <Box>
-                            <Typography variant="h4" sx={{ fontWeight: 800 }}>{loading ? <Skeleton width={40} /> : resolvedAlerts}</Typography>
-                            <Typography variant="body2" color="text.secondary">Resolved</Typography>
-                        </Box>
-                    </Box>
-                </Paper>
-                <Paper elevation={0} sx={{ flex: '1 1 200px', p: 2, borderRadius: 3, bgcolor: alpha('#6366f1', 0.1) }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: '#6366f1', color: 'white' }}>
-                            <AlertIcon />
-                        </Box>
-                        <Box>
-                            <Typography variant="h4" sx={{ fontWeight: 800 }}>{loading ? <Skeleton width={40} /> : alerts.length}</Typography>
-                            <Typography variant="body2" color="text.secondary">Total</Typography>
-                        </Box>
-                    </Box>
-                </Paper>
-            </Box>
+            <AlertStatsBar
+                stats={{ active: activeAlerts, resolved: resolvedAlerts, total: alerts.length, critical: criticalAlerts }}
+                loading={loading}
+            />
 
-            {/* Tabs and Filter */}
             <Card sx={{ mb: 2 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2 }}>
-                    <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)}>
-                        <Tab label={`All (${alerts.length})`} />
-                        <Tab
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, flexWrap: 'wrap', gap: 2 }}>
+                    <Tabs 
+                        value={activeTab} 
+                        onChange={(_, v) => setActiveTab(v)}
+                        sx={{
+                            minHeight: 40,
+                            '& .MuiTab-root': { minHeight: 40, py: 1 }
+                        }}
+                    >
+                        <Tab 
                             label={
-                                <Badge badgeContent={activeAlerts} color="error">
-                                    Active
-                                </Badge>
-                            }
+                                <Chip 
+                                    label={`All (${alerts.length})`} 
+                                    size="small" 
+                                    variant={activeTab === 0 ? 'filled' : 'outlined'}
+                                    sx={{ fontWeight: 600 }}
+                                />
+                            } 
                         />
-                        <Tab label={`Resolved (${resolvedAlerts})`} />
+                        <Tab 
+                            label={
+                                <Chip 
+                                    label={`Active (${activeAlerts})`} 
+                                    size="small" 
+                                    color="error"
+                                    variant={activeTab === 1 ? 'filled' : 'outlined'}
+                                    sx={{ fontWeight: 600 }}
+                                />
+                            } 
+                        />
+                        <Tab 
+                            label={
+                                <Chip 
+                                    label={`Resolved (${resolvedAlerts})`} 
+                                    size="small" 
+                                    color="success"
+                                    variant={activeTab === 2 ? 'filled' : 'outlined'}
+                                    sx={{ fontWeight: 600 }}
+                                />
+                            } 
+                        />
                     </Tabs>
+
                     <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                        <FormControl size="small" sx={{ minWidth: 150 }}>
-                            <InputLabel>Type Filter</InputLabel>
+                        <TextField
+                            size="small"
+                            placeholder="Search alerts..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            InputProps={{
+                                startAdornment: (
+                                    <InputAdornment position="start">
+                                        <SearchIcon sx={{ fontSize: 20, color: 'text.secondary' }} />
+                                    </InputAdornment>
+                                ),
+                                endAdornment: searchQuery && (
+                                    <InputAdornment position="end">
+                                        <IconButton size="small" onClick={() => setSearchQuery('')}>
+                                            <CloseIcon sx={{ fontSize: 16 }} />
+                                        </IconButton>
+                                    </InputAdornment>
+                                ),
+                            }}
+                            sx={{ width: 240 }}
+                        />
+
+                        <FormControl size="small" sx={{ minWidth: 140 }}>
+                            <InputLabel>Type</InputLabel>
                             <Select
                                 value={filters.status}
                                 onChange={(e) => dispatch(setStatusFilter(e.target.value))}
-                                label="Status Filter"
+                                label="Type"
+                                startAdornment={
+                                    <InputAdornment position="start">
+                                        <FilterIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
+                                    </InputAdornment>
+                                }
                             >
-                                <MenuItem value="all">All Status</MenuItem>
+                                <MenuItem value="all">All Types</MenuItem>
                                 <MenuItem value="active">Active</MenuItem>
                                 <MenuItem value="resolved">Resolved</MenuItem>
                             </Select>
@@ -233,180 +388,167 @@ const SOSAlerts = () => {
                 </Box>
             </Card>
 
-            {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+            {error && (
+                <Alert 
+                    severity="error" 
+                    sx={{ mb: 2 }}
+                    action={
+                        <Button color="inherit" size="small" onClick={fetchAlertsData}>
+                            Retry
+                        </Button>
+                    }
+                >
+                    {error}
+                </Alert>
+            )}
 
-            {/* Alerts List */}
-            <Card sx={{ flex: 1, overflow: 'hidden' }}>
+            <Box sx={{ flex: 1, overflow: 'auto' }}>
                 {loading && alerts.length === 0 ? (
-                    <Box sx={{ p: 3 }}>
+                    <Box sx={{ p: 2 }}>
                         {[...Array(5)].map((_, i) => (
-                            <Box key={i} sx={{ display: 'flex', gap: 2, py: 2 }}>
-                                <Skeleton variant="circular" width={48} height={48} />
-                                <Box sx={{ flex: 1 }}>
-                                    <Skeleton width="40%" />
-                                    <Skeleton width="60%" />
-                                </Box>
-                            </Box>
+                            <Card key={i} sx={{ mb: 1.5 }}>
+                                <CardContent sx={{ p: 3 }}>
+                                    <Box sx={{ display: 'flex', gap: 2 }}>
+                                        <Skeleton variant="circular" width={48} height={48} />
+                                        <Box sx={{ flex: 1 }}>
+                                            <Skeleton width="40%" height={24} />
+                                            <Skeleton width="60%" height={20} sx={{ mt: 1 }} />
+                                        </Box>
+                                    </Box>
+                                </CardContent>
+                            </Card>
                         ))}
                     </Box>
                 ) : filteredAlerts.length === 0 ? (
-                    <Box sx={{ textAlign: 'center', py: 8 }}>
-                        <AllClearIcon sx={{ fontSize: 64, color: 'success.main', mb: 2 }} />
-                        <Typography variant="h6" color="text.secondary">No alerts found</Typography>
-                        <Typography variant="body2" color="text.secondary">
-                            {activeTab === 1 ? 'No active alerts at the moment' : 'No alerts match your filter'}
-                        </Typography>
-                    </Box>
+                    <Card>
+                        <Box sx={{ textAlign: 'center', py: 8 }}>
+                            <Box
+                                sx={{
+                                    width: 120,
+                                    height: 120,
+                                    borderRadius: '50%',
+                                    bgcolor: activeTab === 1 ? alpha('#10b981', 0.1) : alpha('#6366f1', 0.1),
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    mx: 'auto',
+                                    mb: 3,
+                                }}
+                            >
+                                {activeTab === 1 ? (
+                                    <CheckCircleIcon sx={{ fontSize: 60, color: '#10b981' }} />
+                                ) : searchQuery ? (
+                                    <SearchIcon sx={{ fontSize: 60, color: '#6366f1' }} />
+                                ) : (
+                                    <AllClearIcon sx={{ fontSize: 60, color: '#6366f1' }} />
+                                )}
+                            </Box>
+                            <Typography variant="h5" fontWeight={600} color="text.primary" sx={{ mb: 1 }}>
+                                {activeTab === 1 
+                                    ? 'No Active Alerts' 
+                                    : searchQuery 
+                                        ? 'No Matching Alerts'
+                                        : 'No Alerts Found'}
+                            </Typography>
+                            <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 400, mx: 'auto' }}>
+                                {activeTab === 1
+                                    ? 'Great news! All emergency alerts have been resolved. Stay vigilant.'
+                                    : searchQuery
+                                        ? `No alerts match "${searchQuery}". Try adjusting your search.`
+                                        : 'No alerts match your current filter criteria.'}
+                            </Typography>
+                            {searchQuery && (
+                                <Button
+                                    variant="text"
+                                    sx={{ mt: 2 }}
+                                    onClick={() => setSearchQuery('')}
+                                >
+                                    Clear Search
+                                </Button>
+                            )}
+                        </Box>
+                    </Card>
                 ) : (
-                    <List sx={{ overflow: 'auto', maxHeight: '100%' }}>
-                        {filteredAlerts.map((alert, index) => {
-                            const status = statusConfig[alert.status] || statusConfig.active;
-                            const type = typeConfig[alert.type] || typeConfig.emergency;
-                            return (
-                                <React.Fragment key={alert.id}>
-                                    <ListItem
-                                        sx={{
-                                            cursor: 'pointer',
-                                            bgcolor: alert.status === 'active' ? alpha('#ef4444', 0.03) : 'transparent',
-                                            '&:hover': { bgcolor: 'action.hover' },
-                                            py: 2,
-                                        }}
-                                        onClick={() => openDetailDrawer(alert)}
-                                    >
-                                        <ListItemAvatar>
-                                            <Avatar
-                                                sx={{
-                                                    bgcolor: status.color,
-                                                    width: 48,
-                                                    height: 48,
-                                                    fontSize: '1.25rem',
-                                                    animation: alert.status === 'active' ? 'pulse 2s infinite' : 'none',
-                                                }}
-                                            >
-                                                {status.icon}
-                                            </Avatar>
-                                        </ListItemAvatar>
-                                        <ListItemText
-                                            primary={
-                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                                    <Typography variant="subtitle1" fontWeight={700}>
-                                                        {alert.userName || 'Unknown User'}
-                                                    </Typography>
-                                                    <Chip
-                                                        label={alert.type || 'emergency'}
-                                                        size="small"
-                                                        sx={{
-                                                            bgcolor: type.bg,
-                                                            color: type.color,
-                                                            fontWeight: 600,
-                                                            fontSize: '0.7rem',
-                                                        }}
-                                                    />
-                                                </Box>
-                                            }
-                                            secondary={
-                                                <Box>
-                                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5, maxWidth: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                        {alert.message || 'Emergency alert triggered'}
-                                                    </Typography>
-                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                            <LocationIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
-                                                            <Typography variant="caption" color="text.secondary">
-                                                                {alert.location || 'Unknown location'}
-                                                            </Typography>
-                                                        </Box>
-                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                            <TimeIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
-                                                            <Typography variant="caption" color="text.secondary">
-                                                                {formatTime(alert.createdAt)}
-                                                            </Typography>
-                                                        </Box>
-                                                    </Box>
-                                                </Box>
-                                            }
-                                        />
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                            {alert.status === 'active' && (
-                                                <Button
-                                                    size="small"
-                                                    variant="contained"
-                                                    color="success"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setResolveDrawer({ open: true, alert });
-                                                    }}
-                                                >
-                                                    Resolve
-                                                </Button>
-                                            )}
-                                            <Chip
-                                                label={status.label}
-                                                size="small"
-                                                sx={{
-                                                    bgcolor: status.bg,
-                                                    color: status.color,
-                                                    fontWeight: 600,
-                                                }}
-                                            />
-                                        </Box>
-                                    </ListItem>
-                                    {index < filteredAlerts.length - 1 && <Divider />}
-                                </React.Fragment>
-                            );
-                        })}
-                    </List>
+                    <Box>
+                        {filteredAlerts.map((alert) => (
+                            <AlertCard
+                                key={alert.id}
+                                alert={alert}
+                                onView={openDetailDrawer}
+                                onResolve={(a) => setResolveDrawer({ open: true, alert: a })}
+                                onCall={handleCallUser}
+                            />
+                        ))}
+                    </Box>
                 )}
-            </Card>
+            </Box>
 
-            {/* Detail Drawer */}
             <Drawer
                 anchor="right"
                 open={detailDrawer.open}
                 onClose={() => setDetailDrawer({ open: false, alert: null })}
-                PaperProps={{ sx: { width: 420 } }}
+                PaperProps={{ sx: { width: { xs: '100%', sm: 420 } } }}
             >
                 {selectedAlert && (
                     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                        {/* Header */}
-                        <Box sx={{ p: 3, bgcolor: statusConfig[selectedAlert.status]?.color || '#ef4444', color: 'white' }}>
+                        <Box sx={{ 
+                            p: 3, 
+                            bgcolor: selectedAlert.status === 'active' ? '#ef4444' : '#10b981', 
+                            color: 'white',
+                            position: 'sticky',
+                            top: 0,
+                            zIndex: 1
+                        }}>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                                <Typography variant="h5" fontWeight={700}>
-                                    Alert Details
-                                </Typography>
+                                <Box>
+                                    <Typography variant="h5" fontWeight={700}>
+                                        Alert Details
+                                    </Typography>
+                                    <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                                        ID: {selectedAlert.id}
+                                    </Typography>
+                                </Box>
                                 <IconButton sx={{ color: 'white' }} onClick={() => setDetailDrawer({ open: false, alert: null })}>
                                     <CloseIcon />
                                 </IconButton>
                             </Box>
-                            <Box sx={{ display: 'flex', gap: 1 }}>
+                            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                                 <Chip
                                     label={selectedAlert.status?.toUpperCase() || 'ACTIVE'}
                                     sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white', fontWeight: 700 }}
                                 />
                                 <Chip
-                                    label={selectedAlert.type || 'EMERGENCY'}
+                                    label={selectedAlert.type?.toUpperCase() || 'EMERGENCY'}
                                     sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white', fontWeight: 700 }}
                                 />
                             </Box>
                         </Box>
 
-                        {/* Content */}
                         <Box sx={{ flex: 1, overflow: 'auto', p: 3 }}>
-                            {/* User Info */}
                             <Box sx={{ mb: 3 }}>
-                                <Typography variant="caption" color="text.secondary" fontWeight={600}>USER</Typography>
-                                <Paper elevation={0} sx={{ p: 2, mt: 1, bgcolor: 'background.default', borderRadius: 2 }}>
+                                <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ display: 'block', mb: 1 }}>
+                                    USER INFORMATION
+                                </Typography>
+                                <Paper elevation={0} sx={{ p: 2, bgcolor: 'background.default', borderRadius: 2 }}>
                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                        <Avatar sx={{ width: 48, height: 48, bgcolor: 'primary.main' }}>
+                                        <Avatar 
+                                            sx={{ 
+                                                width: 56, 
+                                                height: 56, 
+                                                bgcolor: 'primary.main', 
+                                                fontSize: '1.25rem',
+                                                boxShadow: 2,
+                                            }}
+                                        >
                                             {selectedAlert.userName?.charAt(0) || 'U'}
                                         </Avatar>
-                                        <Box>
+                                        <Box sx={{ flex: 1 }}>
                                             <Typography variant="subtitle1" fontWeight={700}>
                                                 {selectedAlert.userName || 'Unknown User'}
                                             </Typography>
                                             {selectedAlert.userPhone && (
-                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                    <PhoneIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
+                                                    <PhoneIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
                                                     <Typography variant="body2" color="text.secondary">
                                                         {selectedAlert.userPhone}
                                                     </Typography>
@@ -414,31 +556,65 @@ const SOSAlerts = () => {
                                             )}
                                         </Box>
                                     </Box>
+                                    {selectedAlert.userPhone && (
+                                        <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
+                                            <Button
+                                                variant="contained"
+                                                fullWidth
+                                                startIcon={<PhoneIcon />}
+                                                onClick={() => handleCallUser(selectedAlert.userPhone)}
+                                            >
+                                                Call User
+                                            </Button>
+                                        </Box>
+                                    )}
                                 </Paper>
                             </Box>
 
-                            {/* Message */}
                             <Box sx={{ mb: 3 }}>
-                                <Typography variant="caption" color="text.secondary" fontWeight={600}>MESSAGE</Typography>
-                                <Paper elevation={0} sx={{ p: 2, mt: 1, bgcolor: 'background.default', borderRadius: 2 }}>
-                                    <Typography variant="body2">
+                                <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ display: 'block', mb: 1 }}>
+                                    ALERT MESSAGE
+                                </Typography>
+                                <Paper 
+                                    elevation={0} 
+                                    sx={{ 
+                                        p: 2, 
+                                        bgcolor: 'background.default', 
+                                        borderRadius: 2,
+                                        borderLeft: '4px solid',
+                                        borderLeftColor: selectedAlert.status === 'active' ? '#ef4444' : '#10b981',
+                                    }}
+                                >
+                                    <Typography variant="body1">
                                         {selectedAlert.message || 'Emergency alert triggered'}
                                     </Typography>
                                 </Paper>
                             </Box>
 
-                            {/* Location */}
                             <Box sx={{ mb: 3 }}>
-                                <Typography variant="caption" color="text.secondary" fontWeight={600}>LOCATION</Typography>
-                                <Paper elevation={0} sx={{ p: 2, mt: 1, bgcolor: 'background.default', borderRadius: 2 }}>
+                                <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ display: 'block', mb: 1 }}>
+                                    LOCATION
+                                </Typography>
+                                <Paper elevation={0} sx={{ p: 2, bgcolor: 'background.default', borderRadius: 2 }}>
                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                                        <LocationIcon sx={{ color: 'primary.main' }} />
-                                        <Typography variant="body2">
+                                        <LocationIcon sx={{ color: '#ef4444' }} />
+                                        <Typography variant="body2" fontWeight={500}>
                                             {selectedAlert.location || 'Unknown location'}
                                         </Typography>
                                     </Box>
                                     {(selectedAlert.latitude || selectedAlert.longitude) && (
-                                        <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
+                                        <Typography 
+                                            variant="caption" 
+                                            color="text.secondary" 
+                                            sx={{ 
+                                                fontFamily: 'monospace', 
+                                                display: 'block', 
+                                                mb: 2,
+                                                bgcolor: alpha('#000', 0.05),
+                                                p: 1,
+                                                borderRadius: 1,
+                                            }}
+                                        >
                                             {selectedAlert.latitude?.toFixed(6)}, {selectedAlert.longitude?.toFixed(6)}
                                         </Typography>
                                     )}
@@ -446,77 +622,111 @@ const SOSAlerts = () => {
                                         fullWidth
                                         variant="outlined"
                                         startIcon={<MapIcon />}
-                                        sx={{ mt: 2 }}
                                         onClick={() => window.open(`https://www.google.com/maps?q=${selectedAlert.latitude},${selectedAlert.longitude}`, '_blank')}
+                                        sx={{ mt: 1 }}
                                     >
-                                        Open in Maps
+                                        Open in Google Maps
                                     </Button>
                                 </Paper>
                             </Box>
 
-                            {/* Time */}
                             <Box sx={{ mb: 3 }}>
-                                <Typography variant="caption" color="text.secondary" fontWeight={600}>TIMELINE</Typography>
-                                <Paper elevation={0} sx={{ p: 2, mt: 1, bgcolor: 'background.default', borderRadius: 2 }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                        <TimeIcon sx={{ color: 'primary.main' }} />
+                                <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ display: 'block', mb: 1 }}>
+                                    TIMELINE
+                                </Typography>
+                                <Paper elevation={0} sx={{ p: 2, bgcolor: 'background.default', borderRadius: 2 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: selectedAlert.resolvedAt ? 1 : 0 }}>
+                                        <Box
+                                            sx={{
+                                                width: 8,
+                                                height: 8,
+                                                borderRadius: '50%',
+                                                bgcolor: '#ef4444',
+                                            }}
+                                        />
                                         <Typography variant="body2">
-                                            Triggered: {new Date(selectedAlert.createdAt).toLocaleString()}
+                                            <strong>Triggered:</strong> {new Date(selectedAlert.createdAt).toLocaleString()}
                                         </Typography>
                                     </Box>
                                     {selectedAlert.resolvedAt && (
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
-                                            <CheckCircleIcon sx={{ color: 'success.main' }} />
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <Box
+                                                sx={{
+                                                    width: 8,
+                                                    height: 8,
+                                                    borderRadius: '50%',
+                                                    bgcolor: '#10b981',
+                                                }}
+                                            />
                                             <Typography variant="body2">
-                                                Resolved: {new Date(selectedAlert.resolvedAt).toLocaleString()}
+                                                <strong>Resolved:</strong> {new Date(selectedAlert.resolvedAt).toLocaleString()}
                                             </Typography>
                                         </Box>
                                     )}
                                 </Paper>
                             </Box>
 
-                            {/* Nearby Services */}
                             {nearbyServices.length > 0 && (
                                 <Box sx={{ mb: 3 }}>
-                                    <Typography variant="caption" color="text.secondary" fontWeight={600}>NEARBY EMERGENCY SERVICES</Typography>
-                                    <List dense sx={{ mt: 1 }}>
-                                        {nearbyServices.slice(0, 5).map((service) => (
-                                            <ListItem key={service.id} sx={{ px: 0 }}>
-                                                <ListItemAvatar>
-                                                    <Avatar sx={{ bgcolor: 'background.default' }}>
-                                                        {service.type === 'police' ? '👮' : service.type === 'hospital' ? '🏥' : '🛡️'}
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                                        <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                                            NEARBY EMERGENCY SERVICES
+                                        </Typography>
+                                        <Chip label={`${nearbyServices.length} found`} size="small" />
+                                    </Box>
+                                    <List disablePadding>
+                                        {nearbyServices.slice(0, 5).map((service, index) => (
+                                            <Paper 
+                                                key={index} 
+                                                elevation={0} 
+                                                sx={{ 
+                                                    p: 1.5, 
+                                                    mb: 1, 
+                                                    bgcolor: 'background.default', 
+                                                    borderRadius: 2,
+                                                    transition: 'transform 0.2s',
+                                                    '&:hover': { transform: 'translateX(4px)' },
+                                                }}
+                                            >
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                                    <Avatar sx={{ width: 36, height: 36, bgcolor: 'primary.main', fontSize: '0.875rem' }}>
+                                                        {service.type === 'police' ? '🚔' : service.type === 'hospital' ? '🏥' : '🛡️'}
                                                     </Avatar>
-                                                </ListItemAvatar>
-                                                <ListItemText
-                                                    primary={service.name}
-                                                    secondary={`${(service.distance / 1000).toFixed(1)} km away`}
-                                                />
-                                                {service.phone && (
-                                                    <IconButton
-                                                        size="small"
-                                                        onClick={() => window.open(`tel:${service.phone}`, '_self')}
-                                                    >
-                                                        <PhoneIcon />
-                                                    </IconButton>
-                                                )}
-                                            </ListItem>
+                                                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                                                        <Typography variant="body2" fontWeight={600} noWrap>{service.name}</Typography>
+                                                        <Typography variant="caption" color="text.secondary">
+                                                            {service.type?.replace('_', ' ')} • {(service.distance / 1000).toFixed(1)} km
+                                                        </Typography>
+                                                    </Box>
+                                                    {service.phone && (
+                                                        <IconButton
+                                                            size="small"
+                                                            color="primary"
+                                                            onClick={() => window.open(`tel:${service.phone}`, '_self')}
+                                                        >
+                                                            <PhoneIcon fontSize="small" />
+                                                        </IconButton>
+                                                    )}
+                                                </Box>
+                                            </Paper>
                                         ))}
                                     </List>
                                 </Box>
                             )}
                         </Box>
 
-                        {/* Actions */}
                         {selectedAlert.status === 'active' && (
-                            <Box sx={{ p: 3, borderTop: 1, borderColor: 'divider' }}>
+                            <Box sx={{ p: 3, borderTop: 1, borderColor: 'divider', bgcolor: 'background.default' }}>
                                 <Button
                                     fullWidth
                                     variant="contained"
                                     color="success"
                                     size="large"
+                                    startIcon={<CheckCircleIcon />}
                                     onClick={() => {
                                         setResolveDrawer({ open: true, alert: selectedAlert });
                                     }}
+                                    sx={{ fontWeight: 600 }}
                                 >
                                     Mark as Resolved
                                 </Button>
@@ -526,14 +736,30 @@ const SOSAlerts = () => {
                 )}
             </Drawer>
 
-            {/* Resolve Drawer */}
             <Drawer
                 anchor="bottom"
                 open={resolveDrawer.open}
                 onClose={() => setResolveDrawer({ open: false, alert: null })}
                 PaperProps={{ sx: { borderRadius: '16px 16px 0 0', p: 3 } }}
             >
-                <Typography variant="h6" sx={{ mb: 2 }}>Resolve Alert</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                    <Box
+                        sx={{
+                            p: 1.5,
+                            borderRadius: 2,
+                            bgcolor: alpha('#10b981', 0.1),
+                            color: '#10b981',
+                        }}
+                    >
+                        <CheckCircleIcon />
+                    </Box>
+                    <Box>
+                        <Typography variant="h6">Resolve Alert</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                            Mark this emergency as handled
+                        </Typography>
+                    </Box>
+                </Box>
                 <Alert severity="info" sx={{ mb: 3 }}>
                     You're about to mark this SOS alert as resolved. This will notify the user that help has arrived.
                 </Alert>
@@ -547,32 +773,29 @@ const SOSAlerts = () => {
                     placeholder="Add notes about how the situation was resolved..."
                     sx={{ mb: 3 }}
                 />
-                <Box sx={{ display: 'flex', gap: 2 }}>
-                    <Button
-                        fullWidth
-                        variant="outlined"
-                        onClick={() => setResolveDrawer({ open: false, alert: null })}
-                    >
-                        Cancel
-                    </Button>
-                    <Button
-                        fullWidth
-                        variant="contained"
-                        color="success"
-                        onClick={handleResolve}
-                        disabled={loading}
-                    >
-                        Confirm Resolution
-                    </Button>
-                </Box>
+                <Grid container spacing={2}>
+                    <Grid item xs={6}>
+                        <Button
+                            fullWidth
+                            variant="outlined"
+                            onClick={() => setResolveDrawer({ open: false, alert: null })}
+                        >
+                            Cancel
+                        </Button>
+                    </Grid>
+                    <Grid item xs={6}>
+                        <Button
+                            fullWidth
+                            variant="contained"
+                            color="success"
+                            onClick={handleResolve}
+                            disabled={loading}
+                        >
+                            Confirm
+                        </Button>
+                    </Grid>
+                </Grid>
             </Drawer>
-
-            <style>{`
-                @keyframes pulse {
-                    0%, 100% { transform: scale(1); }
-                    50% { transform: scale(1.05); }
-                }
-            `}</style>
         </Box>
     );
 };

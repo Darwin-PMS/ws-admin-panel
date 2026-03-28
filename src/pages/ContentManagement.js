@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     Box,
     Card,
@@ -26,9 +26,14 @@ import {
     TableRow,
     Paper,
     TablePagination,
+    alpha,
+    Tooltip,
+    Avatar,
+    Switch,
+    FormControlLabel,
 } from '@mui/material';
-import { Close as CloseIcon } from '@mui/icons-material';
-import {
+import { 
+    Close as CloseIcon,
     Add as AddIcon,
     Edit as EditIcon,
     Delete as DeleteIcon,
@@ -37,6 +42,13 @@ import {
     Article as ArticleIcon,
     Gavel as LawIcon,
     Phone as PhoneIcon,
+    Image as ImageIcon,
+    VideoLibrary as VideoIcon,
+    CheckCircle as CheckCircleIcon,
+    Cancel as CancelIcon,
+    Star as StarIcon,
+    Visibility as ViewsIcon,
+    TrendingUp as TrendingIcon,
 } from '@mui/icons-material';
 import { useDispatch, useSelector } from 'react-redux';
 import {
@@ -71,16 +83,18 @@ const categoryColors = {
 };
 
 const CONTENT_TYPES = ['tutorials', 'news', 'laws', 'helplines'];
+const TAB_ICONS = [SchoolIcon, ArticleIcon, LawIcon, PhoneIcon];
+const TAB_LABELS = ['Tutorials', 'News', 'Laws', 'Helplines'];
 
 const ContentManagement = () => {
     const dispatch = useDispatch();
     const { tutorials, news, laws, helplines, loading, currentTab, pagination } = useSelector((state) => state.content);
 
-    const [success, setSuccess] = React.useState(null);
-    const [localError, setLocalError] = React.useState(null);
-    const [dialog, setDialog] = React.useState({ open: false, mode: 'create', data: null });
+    const [success, setSuccess] = useState(null);
+    const [localError, setLocalError] = useState(null);
+    const [dialog, setDialog] = useState({ open: false, mode: 'create', data: null });
 
-    const [formData, setFormData] = React.useState({
+    const [formData, setFormData] = useState({
         title: '', description: '', content: '', category: '',
         image_url: '', video_url: '', duration: 0, difficulty: 'beginner',
         is_premium: false, is_active: true, is_featured: false,
@@ -106,6 +120,15 @@ const ContentManagement = () => {
             default: break;
         }
     };
+
+    const getCounts = () => ({
+        tutorials: tutorials.length,
+        news: news.length,
+        laws: laws.length,
+        helplines: helplines.length,
+    });
+
+    const counts = getCounts();
 
     const handleTabChange = (event, newValue) => {
         dispatch(setCurrentTab(newValue));
@@ -282,6 +305,98 @@ const ContentManagement = () => {
         </>
     );
 
+    const renderContentCard = (item) => {
+        const tabIcon = TAB_ICONS[currentTab];
+        const title = item.title || item.name;
+        const category = item.category || item.service_type;
+        const hasImage = item.image_url;
+        
+        return (
+            <Card 
+                key={item.id}
+                sx={{ 
+                    height: '100%',
+                    transition: 'all 0.2s',
+                    '&:hover': {
+                        transform: 'translateY(-4px)',
+                        boxShadow: 4,
+                    }
+                }}
+            >
+                {hasImage ? (
+                    <Box 
+                        sx={{ 
+                            height: 140, 
+                            backgroundImage: `url(${item.image_url})`,
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center',
+                            borderRadius: '12px 12px 0 0',
+                        }}
+                    />
+                ) : (
+                    <Box 
+                        sx={{ 
+                            height: 140, 
+                            bgcolor: alpha(categoryColors[category] || '#6366f1', 0.1),
+                            borderRadius: '12px 12px 0 0',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                        }}
+                    >
+                        <tabIcon sx={{ fontSize: 48, color: categoryColors[category] || '#6366f1', opacity: 0.5 }} />
+                    </Box>
+                )}
+                <CardContent>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                        <Chip 
+                            label={category} 
+                            size="small" 
+                            sx={{ 
+                                bgcolor: alpha(categoryColors[category] || '#666', 0.1), 
+                                color: categoryColors[category] || '#666',
+                                fontWeight: 600,
+                            }} 
+                        />
+                        {item.is_featured && (
+                            <StarIcon sx={{ color: '#f59e0b', fontSize: 20 }} />
+                        )}
+                    </Box>
+                    <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1, lineHeight: 1.3 }}>
+                        {title}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2, minHeight: 40, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {(item.description || item.description_helpline || '').substring(0, 80)}...
+                    </Typography>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Chip 
+                            icon={item.is_active !== false ? <CheckCircleIcon sx={{ fontSize: 16 }} /> : <CancelIcon sx={{ fontSize: 16 }} />}
+                            label={item.is_active !== false ? 'Active' : 'Inactive'} 
+                            size="small"
+                            sx={{ 
+                                bgcolor: item.is_active !== false ? alpha('#10b981', 0.1) : alpha('#ef4444', 0.1),
+                                color: item.is_active !== false ? '#10b981' : '#ef4444',
+                                '& .MuiChip-icon': { color: 'inherit' }
+                            }} 
+                        />
+                        <Box sx={{ display: 'flex', gap: 0.5 }}>
+                            <Tooltip title="Edit">
+                                <IconButton size="small" onClick={() => openDialog('edit', item)}>
+                                    <EditIcon fontSize="small" />
+                                </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Delete">
+                                <IconButton size="small" color="error" onClick={() => handleDelete(item.id)}>
+                                    <DeleteIcon fontSize="small" />
+                                </IconButton>
+                            </Tooltip>
+                        </Box>
+                    </Box>
+                </CardContent>
+            </Card>
+        );
+    };
+
     const allColumns = [
         ['Title', 'Category', 'Difficulty', 'Active', 'Created'],
         ['Title', 'Category', 'Author', 'Featured', 'Views'],
@@ -290,65 +405,16 @@ const ContentManagement = () => {
     ];
     const columns = allColumns[currentTab] || allColumns[0];
 
-    const renderTable = () => (
-        <TableContainer component={Paper}>
-            <Table size="small">
-                <TableHead>
-                    <TableRow sx={{ bgcolor: 'primary.main' }}>
-                        {columns.map((col) => (
-                            <TableCell key={col} sx={{ color: 'white', fontWeight: 'bold' }}>{col}</TableCell>
-                        ))}
-                        <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Actions</TableCell>
-                    </TableRow>
-                </TableHead>
-                <TableBody>
-                    {currentContent.map((item) => (
-                        <TableRow key={item.id} hover>
-                            <TableCell sx={{ maxWidth: 200 }}>
-                                <Typography variant="body2" noWrap>{item.title || item.name}</Typography>
-                            </TableCell>
-                            <TableCell>
-                                <Chip label={item.category || item.service_type} size="small" sx={{ bgcolor: `${categoryColors[item.category] || '#666'}20`, color: categoryColors[item.category] || '#666' }} />
-                            </TableCell>
-                            <TableCell>{item.difficulty || item.author || item.jurisdiction || item.country || '-'}</TableCell>
-                            <TableCell>
-                                <Chip label={item.is_active !== false ? 'Active' : 'Inactive'} size="small"
-                                    sx={{ bgcolor: item.is_active !== false ? 'success.main' : 'error.main', color: 'white' }} />
-                            </TableCell>
-                            <TableCell>{item.created_at ? new Date(item.created_at).toLocaleDateString() : '-'}</TableCell>
-                            <TableCell>
-                                <IconButton size="small" onClick={() => openDialog('edit', item)}><EditIcon /></IconButton>
-                                <IconButton size="small" color="error" onClick={() => handleDelete(item.id)}><DeleteIcon /></IconButton>
-                            </TableCell>
-                        </TableRow>
-                    ))}
-                    {currentContent.length === 0 && (
-                        <TableRow>
-                            <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                                <Typography color="text.secondary">No data available</Typography>
-                            </TableCell>
-                        </TableRow>
-                    )}
-                </TableBody>
-            </Table>
-            <TablePagination
-                rowsPerPageOptions={[5, 10, 25]}
-                component="div"
-                count={currentPagination.total}
-                rowsPerPage={currentPagination.rowsPerPage}
-                page={currentPagination.page}
-                onPageChange={handleChangePage}
-                onRowsPerPageChange={handleChangeRowsPerPage}
-            />
-        </TableContainer>
-    );
-
     return (
         <Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
                 <Box>
-                    <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>Content Management</Typography>
-                    <Typography variant="body2" color="text.secondary">Manage tutorials, news, laws, and helplines</Typography>
+                    <Typography variant="h4" sx={{ fontWeight: 800, mb: 0.5 }}>
+                        Content Management
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                        Manage tutorials, news, laws, and helplines for users
+                    </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', gap: 2 }}>
                     <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchData}>Refresh</Button>
@@ -359,26 +425,114 @@ const ContentManagement = () => {
             {localError && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setLocalError(null)}>{localError}</Alert>}
             {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess(null)}>{success}</Alert>}
 
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+                {CONTENT_TYPES.map((type, index) => {
+                    const Icon = TAB_ICONS[index];
+                    const color = index === 0 ? '#6366f1' : index === 1 ? '#10b981' : index === 2 ? '#f59e0b' : '#ef4444';
+                    return (
+                        <Grid item xs={6} sm={3} key={type}>
+                            <Card 
+                                sx={{ 
+                                    cursor: 'pointer',
+                                    border: currentTab === index ? 2 : 1,
+                                    borderColor: currentTab === index ? color : 'divider',
+                                    transition: 'all 0.2s',
+                                    '&:hover': { borderColor: color }
+                                }}
+                                onClick={() => dispatch(setCurrentTab(index))}
+                            >
+                                <CardContent sx={{ py: 2 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                        <Avatar sx={{ bgcolor: alpha(color, 0.1), color }}>
+                                            <Icon />
+                                        </Avatar>
+                                        <Box>
+                                            <Typography variant="h5" fontWeight={700}>{counts[type]}</Typography>
+                                            <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'capitalize' }}>
+                                                {type}
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                </CardContent>
+                            </Card>
+                        </Grid>
+                    );
+                })}
+            </Grid>
+
             <Card sx={{ mb: 3 }}>
-                <Tabs value={currentTab} onChange={handleTabChange} sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                    <Tab icon={<SchoolIcon />} iconPosition="start" label="Tutorials" />
-                    <Tab icon={<ArticleIcon />} iconPosition="start" label="News" />
-                    <Tab icon={<LawIcon />} iconPosition="start" label="Laws" />
-                    <Tab icon={<PhoneIcon />} iconPosition="start" label="Helplines" />
+                <Tabs 
+                    value={currentTab} 
+                    onChange={handleTabChange} 
+                    sx={{ 
+                        borderBottom: 1, 
+                        borderColor: 'divider',
+                        '& .MuiTab-root': { minHeight: 56 }
+                    }}
+                >
+                    {TAB_LABELS.map((label, index) => {
+                        const Icon = TAB_ICONS[index];
+                        return (
+                            <Tab 
+                                key={label} 
+                                icon={<Icon />} 
+                                iconPosition="start" 
+                                label={label} 
+                            />
+                        );
+                    })}
                 </Tabs>
             </Card>
 
-            <Card>
-                <CardContent>
-                    {loading && <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress /></Box>}
-                    {!loading && renderTable()}
-                </CardContent>
-            </Card>
+            <Grid container spacing={3}>
+                {currentContent.length === 0 ? (
+                    <Grid item xs={12}>
+                        <Card sx={{ py: 8 }}>
+                            <Box sx={{ textAlign: 'center' }}>
+                                {React.createElement(TAB_ICONS[currentTab], { sx: { fontSize: 80, color: 'text.disabled', mb: 2 } })}
+                                <Typography variant="h5" color="text.secondary" sx={{ mb: 1 }}>
+                                    No {TAB_LABELS[currentTab]} Found
+                                </Typography>
+                                <Typography variant="body2" color="text.disabled" sx={{ mb: 3 }}>
+                                    Click "Add Content" to create your first {TAB_LABELS[currentTab].slice(0, -1)}
+                                </Typography>
+                                <Button 
+                                    variant="contained" 
+                                    startIcon={<AddIcon />} 
+                                    onClick={() => openDialog('create')}
+                                >
+                                    Add {TAB_LABELS[currentTab].slice(0, -1)}
+                                </Button>
+                            </Box>
+                        </Card>
+                    </Grid>
+                ) : (
+                    currentContent.map((item) => (
+                        <Grid item xs={12} sm={6} md={4} lg={3} key={item.id}>
+                            {renderContentCard(item)}
+                        </Grid>
+                    ))
+                )}
+            </Grid>
+
+            {currentContent.length > 0 && (
+                <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
+                    <TablePagination
+                        rowsPerPageOptions={[8, 16, 24, 32]}
+                        component="div"
+                        count={currentPagination.total}
+                        rowsPerPage={currentPagination.rowsPerPage}
+                        page={currentPagination.page}
+                        onPageChange={handleChangePage}
+                        onRowsPerPageChange={handleChangeRowsPerPage}
+                    />
+                </Box>
+            )}
 
             <Drawer anchor="right" open={dialog.open} onClose={closeDialog}>
                 <Box sx={{ width: 450, p: 3 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                        <Typography variant="h6">{dialog.mode === 'create' ? 'Add' : 'Edit'} {CONTENT_TYPES[currentTab]}</Typography>
+                        <Typography variant="h6">{dialog.mode === 'create' ? 'Add' : 'Edit'} {TAB_LABELS[currentTab].slice(0, -1)}</Typography>
                         <IconButton onClick={closeDialog}><CloseIcon /></IconButton>
                     </Box>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>

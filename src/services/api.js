@@ -91,6 +91,17 @@ export const adminApi = {
     delete: (id) => api.delete(ENDPOINTS.devices.delete(id)),
   },
 
+  iot: {
+    list: (params) => api.get(ENDPOINTS.iot.list, { params }),
+    get: (id) => api.get(ENDPOINTS.iot.get(id)),
+    create: (data) => api.post(ENDPOINTS.iot.create, data),
+    update: (id, data) => api.put(ENDPOINTS.iot.update(id), data),
+    control: (id, command) => api.post(ENDPOINTS.iot.control(id), command),
+    toggle: (id) => api.put(ENDPOINTS.iot.toggle(id)),
+    delete: (id) => api.delete(ENDPOINTS.iot.delete(id)),
+    stats: () => api.get(ENDPOINTS.iot.stats),
+  },
+
   tracking: {
     locations: (params) => api.get(ENDPOINTS.tracking.locations, { params }),
     family: (familyId, params) => api.get(ENDPOINTS.tracking.family(familyId), { params }),
@@ -163,6 +174,8 @@ export const adminApi = {
     assign: (id, data) => api.put(ENDPOINTS.grievance.assign(id), data),
     delete: (id) => api.delete(ENDPOINTS.grievance.delete(id)),
     stats: () => api.get(ENDPOINTS.grievance.stats),
+    getConversation: (id) => api.get(ENDPOINTS.grievance.conversation(id)),
+    sendMessage: (data) => api.post(ENDPOINTS.grievance.sendMessage, data),
   },
 
   menus: {
@@ -284,6 +297,8 @@ export const adminApi = {
   assignGrievance: (id, assignedTo) => api.put(ENDPOINTS.grievance.assign(id), { assigned_to: assignedTo }),
   deleteGrievance: (id) => api.delete(ENDPOINTS.grievance.delete(id)),
   getGrievanceStats: () => api.get(ENDPOINTS.grievance.stats),
+  getGrievanceConversation: (id) => api.get(ENDPOINTS.grievance.conversation(id)),
+  sendGrievanceMessage: (data) => api.post(ENDPOINTS.grievance.sendMessage, data),
   getAllMenus: (params) => api.get(ENDPOINTS.menus.list, { params }),
   getMenuById: (id) => api.get(ENDPOINTS.menus.get(id)),
   createMenu: (data) => api.post(ENDPOINTS.menus.create, data),

@@ -3,3 +3,4 @@
 .env
 /docs
 /package-lock.json
+/build

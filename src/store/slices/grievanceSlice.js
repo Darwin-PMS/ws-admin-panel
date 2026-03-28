@@ -13,6 +13,8 @@ const initialState = {
         rowsPerPage: 10,
     },
     totalCount: 0,
+    conversation: [],
+    conversationLoading: false,
 };
 
 export const fetchGrievances = createAsyncThunk(
@@ -112,6 +114,43 @@ export const deleteGrievance = createAsyncThunk(
     }
 );
 
+export const fetchGrievanceConversation = createAsyncThunk(
+    'grievance/fetchConversation',
+    async (grievanceId, { rejectWithValue }) => {
+        try {
+            const response = await adminApi.getGrievanceConversation(grievanceId);
+            if (response.data.success) {
+                return response.data.messages || [];
+            }
+            return rejectWithValue('Failed to fetch conversation');
+        } catch (error) {
+            return rejectWithValue(error.message || 'Network error');
+        }
+    }
+);
+
+export const sendGrievanceMessage = createAsyncThunk(
+    'grievance/sendMessage',
+    async (messageData, { rejectWithValue }) => {
+        try {
+            const response = await adminApi.sendGrievanceMessage(messageData);
+            return response.data.message || {
+                ...messageData,
+                id: response.data.id || `temp_${Date.now()}`,
+                created_at: new Date().toISOString(),
+            };
+        } catch (error) {
+            console.warn('API call failed, message may be sent via WebSocket:', error);
+            return {
+                ...messageData,
+                id: `temp_${Date.now()}`,
+                created_at: new Date().toISOString(),
+                via_websocket: true,
+            };
+        }
+    }
+);
+
 const grievanceSlice = createSlice({
     name: 'grievance',
     initialState,
@@ -133,6 +172,15 @@ const grievanceSlice = createSlice({
         },
         clearError: (state) => {
             state.error = null;
+        },
+        clearConversation: (state) => {
+            state.conversation = [];
+        },
+        addMessage: (state, action) => {
+            const newMessage = action.payload;
+            if (!state.conversation.find(m => m.id === newMessage.id)) {
+                state.conversation.push(newMessage);
+            }
         },
     },
     extraReducers: (builder) => {
@@ -161,6 +209,19 @@ const grievanceSlice = createSlice({
             })
             .addCase(deleteGrievance.fulfilled, (state, action) => {
                 state.grievances = state.grievances.filter(g => g.id !== action.payload);
+            })
+            .addCase(fetchGrievanceConversation.pending, (state) => {
+                state.conversationLoading = true;
+            })
+            .addCase(fetchGrievanceConversation.fulfilled, (state, action) => {
+                state.conversationLoading = false;
+                state.conversation = action.payload;
+            })
+            .addCase(fetchGrievanceConversation.rejected, (state) => {
+                state.conversationLoading = false;
+            })
+            .addCase(sendGrievanceMessage.fulfilled, (state, action) => {
+                state.conversation.push(action.payload);
             });
     },
 });
@@ -171,6 +232,8 @@ export const {
     setPage,
     setRowsPerPage,
     clearError,
+    clearConversation,
+    addMessage,
 } = grievanceSlice.actions;
 
 export default grievanceSlice.reducer;

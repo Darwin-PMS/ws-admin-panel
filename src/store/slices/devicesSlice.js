@@ -20,7 +20,7 @@ export const fetchDevices = createAsyncThunk(
     'devices/fetchDevices',
     async (params = {}, { rejectWithValue }) => {
         try {
-            const response = await adminApi.getDevices(params);
+            const response = await adminApi.iot.list(params);
             if (response.data.success) {
                 return {
                     devices: response.data.devices || [],
@@ -38,7 +38,7 @@ export const fetchDeviceById = createAsyncThunk(
     'devices/fetchDeviceById',
     async (id, { rejectWithValue }) => {
         try {
-            const response = await adminApi.getDeviceById(id);
+            const response = await adminApi.iot.get(id);
             if (response.data.success) {
                 return response.data.device;
             }
@@ -53,7 +53,7 @@ export const toggleDevice = createAsyncThunk(
     'devices/toggleDevice',
     async (id, { rejectWithValue }) => {
         try {
-            const response = await adminApi.toggleDevice(id);
+            const response = await adminApi.iot.toggle(id);
             if (response.data.success) {
                 return response.data.device;
             }
@@ -68,7 +68,7 @@ export const updateDevice = createAsyncThunk(
     'devices/updateDevice',
     async ({ id, data }, { rejectWithValue }) => {
         try {
-            const response = await adminApi.updateDevice(id, data);
+            const response = await adminApi.iot.update(id, data);
             if (response.data.success) {
                 return response.data.device;
             }
@@ -83,7 +83,7 @@ export const deleteDevice = createAsyncThunk(
     'devices/deleteDevice',
     async (id, { rejectWithValue }) => {
         try {
-            const response = await adminApi.deleteDevice(id);
+            const response = await adminApi.iot.delete(id);
             if (response.data.success) {
                 return id;
             }
@@ -98,11 +98,26 @@ export const addDevice = createAsyncThunk(
     'devices/addDevice',
     async (data, { rejectWithValue }) => {
         try {
-            const response = await adminApi.addDevice(data);
+            const response = await adminApi.iot.create(data);
             if (response.data.success) {
                 return response.data.device;
             }
             return rejectWithValue('Failed to add device');
+        } catch (error) {
+            return rejectWithValue(error.message || 'Network error');
+        }
+    }
+);
+
+export const controlDevice = createAsyncThunk(
+    'devices/controlDevice',
+    async ({ id, command }, { rejectWithValue }) => {
+        try {
+            const response = await adminApi.iot.control(id, command);
+            if (response.data.success) {
+                return response.data.device;
+            }
+            return rejectWithValue('Failed to control device');
         } catch (error) {
             return rejectWithValue(error.message || 'Network error');
         }
@@ -151,7 +166,24 @@ const devicesSlice = createSlice({
             })
             .addCase(fetchDevices.fulfilled, (state, action) => {
                 state.loading = false;
-                state.devices = action.payload.devices;
+                // Normalize device data from API (snake_case to camelCase)
+                state.devices = (action.payload.devices || []).map(device => ({
+                    id: device.id,
+                    name: device.name,
+                    device_type: device.device_type,
+                    room: device.room,
+                    status: device.status,
+                    brightness: device.brightness,
+                    temperature: device.temperature,
+                    speed: device.speed,
+                    isLocked: device.is_locked,
+                    first_name: device.first_name,
+                    last_name: device.last_name,
+                    email: device.email,
+                    user_id: device.user_id,
+                    created_at: device.created_at,
+                    updated_at: device.updated_at,
+                }));
                 state.totalCount = action.payload.total;
             })
             .addCase(fetchDevices.rejected, (state, action) => {
@@ -200,6 +232,16 @@ const devicesSlice = createSlice({
             .addCase(addDevice.fulfilled, (state, action) => {
                 state.devices.push(action.payload);
                 state.totalCount += 1;
+            })
+            // Control Device
+            .addCase(controlDevice.fulfilled, (state, action) => {
+                const index = state.devices.findIndex(d => d.id === action.payload.id);
+                if (index !== -1) {
+                    state.devices[index] = action.payload;
+                }
+                if (state.selectedDevice?.id === action.payload.id) {
+                    state.selectedDevice = action.payload;
+                }
             });
     },
 });
@@ -212,7 +254,7 @@ export const {
     setRowsPerPage,
     clearError,
     clearSelectedDevice,
-    optimisticToggleDevice
+    optimisticToggleDevice,
 } = devicesSlice.actions;
 
 export default devicesSlice.reducer;

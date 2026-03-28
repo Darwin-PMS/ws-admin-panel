@@ -26,17 +26,121 @@ const theme = createTheme({
         success: { main: '#10b981' },
         warning: { main: '#f59e0b' },
         error: { main: '#ef4444' },
+        info: { main: '#06b6d4' },
         text: { primary: '#f8fafc', secondary: '#94a3b8' },
+        divider: 'rgba(148, 163, 184, 0.1)',
     },
     typography: {
         fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-        h1: { fontWeight: 700 }, h2: { fontWeight: 600 }, h3: { fontWeight: 600 },
-        h4: { fontWeight: 600 }, h5: { fontWeight: 500 }, h6: { fontWeight: 500 },
+        h1: { fontWeight: 700, letterSpacing: '-0.02em' },
+        h2: { fontWeight: 600, letterSpacing: '-0.01em' },
+        h3: { fontWeight: 600, letterSpacing: '-0.01em' },
+        h4: { fontWeight: 600 },
+        h5: { fontWeight: 500 },
+        h6: { fontWeight: 500 },
+        body1: { fontSize: '0.9375rem', lineHeight: 1.6 },
+        body2: { fontSize: '0.875rem', lineHeight: 1.5 },
+    },
+    shape: {
+        borderRadius: 8,
     },
     components: {
-        MuiButton: { styleOverrides: { root: { textTransform: 'none', borderRadius: 8, fontWeight: 500 } } },
-        MuiPaper: { styleOverrides: { root: { borderRadius: 12 } } },
-        MuiCard: { styleOverrides: { root: { borderRadius: 12 } } },
+        MuiButton: {
+            styleOverrides: {
+                root: { 
+                    textTransform: 'none', 
+                    borderRadius: 8, 
+                    fontWeight: 500,
+                    boxShadow: 'none',
+                    '&:hover': { boxShadow: 'none' },
+                },
+                contained: {
+                    '&:hover': {
+                        boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)',
+                    },
+                },
+            },
+            defaultProps: {
+                disableElevation: true,
+            },
+        },
+        MuiPaper: { 
+            styleOverrides: { 
+                root: { borderRadius: 12 } 
+            } 
+        },
+        MuiCard: { 
+            styleOverrides: { 
+                root: { borderRadius: 12 } 
+            } 
+        },
+        MuiChip: {
+            styleOverrides: {
+                root: {
+                    borderRadius: 6,
+                    fontWeight: 500,
+                },
+            },
+        },
+        MuiTooltip: {
+            styleOverrides: {
+                tooltip: {
+                    backgroundColor: '#1e293b',
+                    fontSize: '0.75rem',
+                    padding: '8px 12px',
+                    borderRadius: 6,
+                },
+                arrow: {
+                    color: '#1e293b',
+                },
+            },
+        },
+        MuiTableHead: {
+            styleOverrides: {
+                root: {
+                    '& .MuiTableCell-head': {
+                        backgroundColor: 'rgba(99, 102, 241, 0.05)',
+                        fontWeight: 600,
+                        fontSize: '0.75rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        color: '#94a3b8',
+                    },
+                },
+            },
+        },
+        MuiTableCell: {
+            styleOverrides: {
+                root: {
+                    borderBottom: '1px solid rgba(148, 163, 184, 0.1)',
+                    padding: '12px 16px',
+                },
+            },
+        },
+        MuiListItemButton: {
+            styleOverrides: {
+                root: {
+                    borderRadius: 8,
+                    '&.Mui-selected': {
+                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                    },
+                },
+            },
+        },
+        MuiDrawer: {
+            styleOverrides: {
+                paper: {
+                    borderRight: 'none',
+                },
+            },
+        },
+        MuiAppBar: {
+            styleOverrides: {
+                root: {
+                    backgroundImage: 'none',
+                },
+            },
+        },
     },
 });
 

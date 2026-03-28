@@ -6,6 +6,105 @@ const WS_CONFIG = {
     HEARTBEAT_INTERVAL: 25000,
 };
 
+let notificationServiceInstance = null;
+
+class NotificationService {
+    constructor() {
+        this.permission = typeof Notification !== 'undefined' ? Notification.permission : 'default';
+        this.soundEnabled = localStorage.getItem('sos_sound_enabled') !== 'false';
+    }
+
+    async requestPermission() {
+        if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+            this.permission = await Notification.requestPermission();
+        }
+        return this.permission;
+    }
+
+    setSoundEnabled(enabled) {
+        this.soundEnabled = enabled;
+        localStorage.setItem('sos_sound_enabled', enabled.toString());
+    }
+
+    isSoundEnabled() {
+        return this.soundEnabled;
+    }
+
+    async notify(title, options = {}) {
+        if (typeof Notification !== 'undefined' && this.permission === 'granted') {
+            const notification = new Notification(title, {
+                icon: options.icon || '/logo192.png',
+                badge: options.badge || '/logo192.png',
+                tag: options.tag || 'sos-alert',
+                requireInteraction: options.requireInteraction !== false,
+                vibrate: options.vibrate || [200, 100, 200],
+                ...options,
+            });
+
+            notification.onclick = () => {
+                window.focus();
+                notification.close();
+                if (options.onClick) options.onClick();
+            };
+
+            return notification;
+        }
+    }
+
+    async notifySOS(sosData) {
+        await this.notify('SOS ALERT', {
+            body: `${sosData.user?.name || 'Unknown user'} triggered SOS alert!`,
+            tag: 'sos-alert',
+            requireInteraction: true,
+            onClick: () => {
+                if (sosData.onNavigate) sosData.onNavigate();
+            },
+        });
+    }
+
+    playSOSSound() {
+        if (!this.soundEnabled) return;
+
+        try {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            
+            const playBeep = (frequency, startTime, duration) => {
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.frequency.value = frequency;
+                oscillator.type = 'sine';
+                
+                gainNode.gain.setValueAtTime(0.5, startTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+                
+                oscillator.start(startTime);
+                oscillator.stop(startTime + duration);
+            };
+
+            const now = audioContext.currentTime;
+            
+            for (let i = 0; i < 3; i++) {
+                const offset = i * 0.8;
+                playBeep(800, now + offset, 0.3);
+                playBeep(600, now + offset + 0.35, 0.3);
+            }
+        } catch (error) {
+            console.error('Error playing SOS sound:', error);
+        }
+    }
+}
+
+const getNotificationService = () => {
+    if (!notificationServiceInstance) {
+        notificationServiceInstance = new NotificationService();
+    }
+    return notificationServiceInstance;
+};
+
 class WebSocketService {
     constructor() {
         this.ws = null;
@@ -133,6 +232,13 @@ class WebSocketService {
             case 'family_update':
                 this.emit('family_update', payload);
                 break;
+            case 'grievance_message':
+                this.emit(`grievance_message:${payload.grievance_id}`, payload);
+                this.emit('grievance_message', payload);
+                break;
+            case 'grievance_update':
+                this.emit('grievance_update', payload);
+                break;
             case 'subscribed':
                 console.log('WebSocketService: Subscribed to', payload?.channels);
                 break;
@@ -145,7 +251,7 @@ class WebSocketService {
     }
 
     playSOSSound() {
-        notificationService.playSOSSound();
+        getNotificationService().playSOSSound();
     }
 
     subscribe(event, callback) {
@@ -190,6 +296,38 @@ class WebSocketService {
         this.send({ type: 'sos_trigger', payload: { latitude, longitude, message } });
     }
 
+    sendGrievanceMessage(grievanceId, message, senderType = 'admin', senderId = null) {
+        const payload = { 
+            grievance_id: grievanceId, 
+            message,
+            sender_type: senderType,
+            sender_id: senderId
+        };
+        
+        this.send({ 
+            type: 'grievance_message', 
+            payload
+        });
+        
+        return adminApi.sendGrievanceMessage(payload).then(response => {
+            if (response.data.success) {
+                return response.data;
+            }
+            throw new Error(response.data.message || 'Failed to save message');
+        }).catch(err => {
+            console.error('Failed to persist grievance message:', err);
+            return { success: true, message: payload };
+        });
+    }
+
+    subscribeToGrievance(grievanceId) {
+        this.send({ type: 'subscribe', payload: { channels: [`grievance:${grievanceId}`] } });
+    }
+
+    unsubscribeFromGrievance(grievanceId) {
+        this.send({ type: 'unsubscribe', payload: { channels: [`grievance:${grievanceId}`] } });
+    }
+
     subscribeTo(channel) {
         this.subscriptions.add(channel);
         if (this.isConnected) {
@@ -225,96 +363,6 @@ class WebSocketService {
             reconnectAttempts: this.reconnectAttempts,
             subscriptions: Array.from(this.subscriptions),
         };
-    }
-}
-
-class NotificationService {
-    constructor() {
-        this.permission = Notification.permission;
-        this.soundEnabled = localStorage.getItem('sos_sound_enabled') !== 'false';
-    }
-
-    async requestPermission() {
-        if ('Notification' in window && Notification.permission === 'default') {
-            this.permission = await Notification.requestPermission();
-        }
-        return this.permission;
-    }
-
-    setSoundEnabled(enabled) {
-        this.soundEnabled = enabled;
-        localStorage.setItem('sos_sound_enabled', enabled.toString());
-    }
-
-    isSoundEnabled() {
-        return this.soundEnabled;
-    }
-
-    async notify(title, options = {}) {
-        if (this.permission === 'granted') {
-            const notification = new Notification(title, {
-                icon: options.icon || '/logo192.png',
-                badge: options.badge || '/logo192.png',
-                tag: options.tag || 'sos-alert',
-                requireInteraction: options.requireInteraction !== false,
-                vibrate: options.vibrate || [200, 100, 200],
-                ...options,
-            });
-
-            notification.onclick = () => {
-                window.focus();
-                notification.close();
-                if (options.onClick) options.onClick();
-            };
-
-            return notification;
-        }
-    }
-
-    async notifySOS(sosData) {
-        await this.notify('🚨 SOS ALERT', {
-            body: `${sosData.user?.name || 'Unknown user'} triggered SOS alert!`,
-            tag: 'sos-alert',
-            requireInteraction: true,
-            onClick: () => {
-                if (sosData.onNavigate) sosData.onNavigate();
-            },
-        });
-    }
-
-    playSOSSound() {
-        if (!this.soundEnabled) return;
-
-        try {
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            
-            const playBeep = (frequency, startTime, duration) => {
-                const oscillator = audioContext.createOscillator();
-                const gainNode = audioContext.createGain();
-                
-                oscillator.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-                
-                oscillator.frequency.value = frequency;
-                oscillator.type = 'sine';
-                
-                gainNode.gain.setValueAtTime(0.5, startTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
-                
-                oscillator.start(startTime);
-                oscillator.stop(startTime + duration);
-            };
-
-            const now = audioContext.currentTime;
-            
-            for (let i = 0; i < 3; i++) {
-                const offset = i * 0.8;
-                playBeep(800, now + offset, 0.3);
-                playBeep(600, now + offset + 0.35, 0.3);
-            }
-        } catch (error) {
-            console.error('Error playing SOS sound:', error);
-        }
     }
 }
 

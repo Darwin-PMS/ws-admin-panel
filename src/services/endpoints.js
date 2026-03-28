@@ -44,6 +44,16 @@ export const ENDPOINTS = {
     toggle: (id) => `${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/admin/devices/${id}/toggle`,
     delete: (id) => `${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/admin/devices/${id}`,
   },
+  iot: {
+    list: `${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/admin/devices`,
+    get: (id) => `${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/admin/devices/${id}`,
+    create: `${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/admin/devices`,
+    update: (id) => `${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/admin/devices/${id}`,
+    control: (id) => `${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/admin/devices/${id}/control`,
+    toggle: (id) => `${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/admin/devices/${id}/toggle`,
+    delete: (id) => `${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/admin/devices/${id}`,
+    stats: `${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/admin/devices/stats`,
+  },
   tracking: {
     locations: `${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/admin/tracking/locations`,
     family: (familyId) => `${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/admin/tracking/family/${familyId}`,
@@ -107,6 +117,8 @@ export const ENDPOINTS = {
     assign: (id) => `${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/admin/grievance/${id}/assign`,
     delete: (id) => `${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/admin/grievance/${id}`,
     stats: `${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/admin/grievance/stats`,
+    conversation: (id) => `${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/admin/grievance/${id}/messages`,
+    sendMessage: `${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/admin/grievance/message`,
   },
   menus: {
     list: `${API_CONFIG.BASE_URL}/${API_CONFIG.VERSION}/admin/menus`,
